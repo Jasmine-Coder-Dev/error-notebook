@@ -1,0 +1,34 @@
+name: build-desktop
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  pyinstaller:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r server/requirements.txt -r build-requirements.txt
+
+      - name: Build with PyInstaller
+        run: pyinstaller --clean -y cuotiji.spec
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuotiji-${{ matrix.os }}
+          path: dist/cuotiji*
+          if-no-files-found: error

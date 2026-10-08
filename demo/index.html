@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学生错题集</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-inner">
+    <h1 class="logo">学生错题集</h1>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-view="import">录入题目</button>
+      <button class="tab" data-view="bank">错题集</button>
+      <button class="tab" data-view="paper">组卷打印</button>
+      <button class="tab" data-view="analysis">知识点分析</button>
+    </nav>
+    <div class="data-actions">
+      <button class="btn ghost" id="btnAiSettings" type="button">AI 设置</button>
+      <button class="btn ghost" id="btnExport" type="button">导出数据</button>
+      <button class="btn ghost" id="btnImport" type="button">导入数据</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <button class="btn ghost" id="btnSample" type="button">加载示例数据</button>
+    </div>
+  </div>
+</header>
+
+<main id="app">
+
+  <!-- ============ 视图：录入题目 ============ -->
+  <section id="view-import" class="view active">
+    <div class="grid-2">
+
+      <div class="card">
+        <h2 class="card-title">PDF 上传录入</h2>
+        <div id="dropZone" class="drop-zone">
+          <p class="drop-text">将 PDF 文件拖拽到此处</p>
+          <p class="drop-sub">或 <span class="link">点击选择文件</span></p>
+          <input type="file" id="pdfFile" accept="application/pdf" hidden>
+        </div>
+        <p id="pdfStatus" class="status"></p>
+
+        <div id="importMeta" class="import-meta" hidden>
+          <div class="meta-row">
+            <label>年级
+              <select id="impGrade"></select>
+            </label>
+            <label>学期
+              <select id="impTerm"></select>
+            </label>
+            <label>科目
+              <select id="impSubject"></select>
+            </label>
+          </div>
+          <div class="meta-row">
+            <p class="hint">共识别 <b id="impCount">0</b> 道题，默认全部「标记为错题」，可在下方逐题修改文本、取消勾选或删除。</p>
+            <button id="btnAiSplitCheck" class="btn" type="button">AI 校对切分</button>
+            <button id="btnAiTagAll" class="btn" type="button">全部 AI 打标</button>
+            <button id="btnImportAll" class="btn primary" type="button">一键入库</button>
+          </div>
+        </div>
+
+        <div id="previewList" class="preview-list"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">手动添加题目</h2>
+        <form id="manualForm" class="form">
+          <label class="field">
+            <span class="field-label">题干 <i class="req">*</i></span>
+            <textarea id="mText" rows="4" required placeholder="请输入题目内容"></textarea>
+          </label>
+          <label class="field">
+            <span class="field-label">答案 / 解析 <button type="button" class="btn small" id="btnAiSolve">AI 生成答案解析</button></span>
+            <textarea id="mAnswer" rows="3" placeholder="请输入答案或解析（可选）"></textarea>
+          </label>
+          <div class="form-row">
+            <label class="field">
+              <span class="field-label">年级</span>
+              <select id="mGrade"></select>
+            </label>
+            <label class="field">
+              <span class="field-label">学期</span>
+              <select id="mTerm"></select>
+            </label>
+            <label class="field">
+              <span class="field-label">科目</span>
+              <select id="mSubject"></select>
+            </label>
+          </div>
+          <label class="field">
+            <span class="field-label">知识点（多个用逗号分隔） <button type="button" class="btn small" id="btnAiTag">AI 打标</button></span>
+            <input type="text" id="mKp" placeholder="例如：分数乘法, 约分">
+          </label>
+          <label class="field">
+            <span class="field-label">错误原因</span>
+            <input type="text" id="mReason" placeholder="例如：计算粗心、概念不清">
+          </label>
+          <label class="check-field">
+            <input type="checkbox" id="mWrong" checked>
+            <span>标记为错题</span>
+          </label>
+          <button class="btn primary block" type="submit">保存题目</button>
+        </form>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ 视图：错题集 ============ -->
+  <section id="view-bank" class="view">
+    <div class="card">
+      <h2 class="card-title">错题集 <span class="count-badge" id="bankCount">0 题</span></h2>
+      <div class="filter-bar">
+        <select id="fGrade"><option value="">全部年级</option></select>
+        <select id="fTerm"><option value="">全部学期</option></select>
+        <select id="fSubject"><option value="">全部科目</option></select>
+        <select id="fKp"><option value="">全部知识点</option></select>
+        <select id="fMastery"><option value="">全部状态</option></select>
+        <input type="search" id="fKeyword" placeholder="关键词搜索题干 / 答案 / 原因">
+        <button class="btn ghost" id="btnClearFilter" type="button">清空筛选</button>
+      </div>
+    </div>
+    <div id="bankList" class="bank-list"></div>
+    <p id="bankEmpty" class="empty" hidden>暂无符合条件的题目，去「录入题目」添加几道吧。</p>
+  </section>
+
+  <!-- ============ 视图：组卷打印 ============ -->
+  <section id="view-paper" class="view">
+    <div class="card">
+      <h2 class="card-title">组卷打印</h2>
+      <div class="filter-bar">
+        <select id="pGrade"><option value="">全部年级</option></select>
+        <select id="pTerm"><option value="">全部学期</option></select>
+        <select id="pSubject"><option value="">全部科目</option></select>
+        <select id="pKp"><option value="">全部知识点</option></select>
+        <select id="pMastery"><option value="">全部状态</option></select>
+        <label class="check-field inline">
+          <input type="checkbox" id="pOnlyWrong" checked>
+          <span>仅从错题中抽取</span>
+        </label>
+        <label class="count-field">
+          抽题数量
+          <input type="number" id="pCount" min="1" max="100" value="10">
+        </label>
+        <label class="check-field inline">
+          <input type="checkbox" id="pWithAnswers" checked>
+          <span>附答案页</span>
+        </label>
+        <button class="btn primary" id="btnGenPaper" type="button">生成试卷</button>
+        <button class="btn" id="btnPrint" type="button" disabled>打印</button>
+      </div>
+      <p class="hint" id="paperHint">设置筛选条件后点击「生成试卷」，可先在下方预览，再打印。</p>
+    </div>
+    <div id="paperPreview"></div>
+  </section>
+
+  <!-- ============ 视图：知识点分析 ============ -->
+  <section id="view-analysis" class="view">
+    <div class="card">
+      <h2 class="card-title">知识点分析 <span class="count-badge" id="analysisCount">0 个知识点</span></h2>
+      <p class="hint">统计所有「错题」按知识点的出现次数，点击某个知识点可直接针对它抽题组卷。</p>
+    </div>
+    <div id="analysisChart" class="chart card"></div>
+    <p id="analysisEmpty" class="empty" hidden>还没有错题数据，先去录入题目或加载示例数据。</p>
+  </section>
+
+</main>
+
+<!-- 打印区域：打印时仅显示此区域 -->
+<div id="print-area"></div>
+<div id="toast" class="toast" hidden></div>
+
+<!-- 通用弹层 -->
+<div id="modalOverlay" class="modal-overlay" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle"></h3>
+      <button class="modal-close" id="modalClose" type="button" aria-label="关闭">×</button>
+    </div>
+    <div id="modalBody" class="modal-body"></div>
+    <div id="modalFoot" class="modal-foot"></div>
+  </div>
+</div>
+
+<!-- 后端不可达引导页 -->
+<div id="fatalError" class="modal-overlay" hidden>
+  <div class="modal">
+    <div class="modal-head"><h3>无法连接本地服务</h3></div>
+    <div class="modal-body">
+      <p>错题集现在使用本地数据库存储数据，需要本地服务在运行（不再支持直接双击 index.html）。</p>
+      <ul>
+        <li><b>桌面版</b>：直接双击应用图标（自动启动服务并打开浏览器）。</li>
+        <li><b>源码模式</b>：在项目根目录执行
+          <code>python launcher.py</code> 或 <code>uvicorn server.main:app --port 8000</code>，
+          然后刷新本页面。</li>
+      </ul>
+      <p class="hint">数据文件位于用户目录 <code>~/.cuotiji/cuotiji.db</code>。</p>
+    </div>
+  </div>
+</div>
+
+<!-- AI 加载态 -->
+<div id="loading" class="loading-overlay" hidden>
+  <div class="spinner"></div>
+  <span id="loadingText">AI 处理中…</span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/pdfimport.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
