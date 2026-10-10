@@ -18,6 +18,7 @@
       <button class="side-item active" data-view="import"><span class="side-icon">➕</span><span class="side-text">录入题目</span></button>
       <button class="side-item" data-view="bank"><span class="side-icon">🗂</span><span class="side-text">错题集</span></button>
       <button class="side-item" data-view="paper"><span class="side-icon">🖨</span><span class="side-text">组卷打印</span></button>
+      <button class="side-item" data-view="review"><span class="side-icon">🔁</span><span class="side-text">今日复习</span><span class="side-badge" id="revBadge" hidden></span></button>
       <button class="side-item" data-view="analysis"><span class="side-icon">📊</span><span class="side-text">学情分析</span></button>
     </nav>
     <div class="side-sep"></div>
@@ -105,6 +106,13 @@
                 <span class="field-label">答案 / 讲解</span>
                 <textarea id="mAnswer" rows="3" placeholder="可选：答案或讲解"></textarea>
               </label>
+              <div class="field">
+                <span class="field-label">题目配图（可选，比如题目里的图形）
+                  <button type="button" class="btn small" id="mImgBtn">添加图片</button>
+                  <input type="file" id="mImgFile" accept=".png,.jpg,.jpeg,.webp" multiple hidden>
+                </span>
+                <div class="q-imgs" id="mImgs"></div>
+              </div>
               <div class="form-row">
                 <label class="field" id="lblMGrade">
                   <span class="field-label" id="mGradeLabel">年级</span>
@@ -193,6 +201,12 @@
               <input type="checkbox" id="pOnlyWrong" checked>
               <span>只抽错题</span>
             </label>
+            <label class="check-field inline">
+              <input type="checkbox" id="pWeak">
+              <span>薄弱优先
+                <span class="hint-tip" data-tip-key="tipWeak">?</span>
+              </span>
+            </label>
             <label class="count-field">
               抽几题
               <input type="number" id="pCount" min="1" max="100" value="10">
@@ -203,6 +217,9 @@
             </label>
             <button class="btn primary" id="btnGenPaper" type="button">生成试卷</button>
             <button class="btn" id="btnPrint" type="button" disabled>打印</button>
+            <button class="btn" id="btnExam" type="button" title="在电脑上计时做题，交卷后对照答案自己判分">开始模考
+              <span class="hint-tip" data-tip-key="tipExam">?</span>
+            </button>
           </div>
           <p class="hint" id="paperHint">选好条件点「生成试卷」，先预览再打印。</p>
         </div>
@@ -220,6 +237,7 @@
             <div class="ana-tabs">
               <button class="ana-tab active" data-ana="qtype" type="button">题型统计</button>
               <button class="ana-tab" data-ana="kp" type="button">知识点统计</button>
+              <button class="ana-tab" data-ana="trend" type="button">错题趋势</button>
             </div>
           </div>
         </div>
@@ -261,13 +279,55 @@
           <p class="hint">默认只统计「未掌握 + 复习中」的错题；点某一行可直接针对它出题。条尾小色条显示该知识点的掌握情况（红＝未掌握，黄＝复习中，绿＝已掌握）。</p>
         </div>
 
+        <!-- 错题趋势 -->
+        <div class="card ana-panel" id="anaPanelTrend" hidden>
+          <div class="panel-head">
+            <h3>错题量与订正情况的变化</h3>
+            <div class="chart-toggle">
+              <button class="btn small active" id="btnTrendWeek" type="button">按周</button>
+              <button class="btn small" id="btnTrendMonth" type="button">按月</button>
+            </div>
+          </div>
+          <div id="trendChart"></div>
+          <p class="hint">折线越高表示当期新增错题越多；绿色是订正率（已掌握的比例）。偶尔波动很正常，连续上升才需要重点关注。</p>
+        </div>
+
         <div id="analysisEmpty" class="empty-state" hidden>
           <p class="empty-text"></p>
           <button class="btn primary" id="btnGoImport2" type="button">去录题</button>
         </div>
       </section>
 
+      <section id="view-review" class="view">
+        <div class="card">
+          <h2 class="card-title">今日复习 <span class="count-badge" id="revCount">0 题</span></h2>
+          <p class="hint">做错的题会按 1、3、7、15 天的节奏安排重做。点「再练一遍」看答案前先自己做，点「已掌握」就不再安排它。</p>
+        </div>
+        <div id="reviewList"></div>
+        <div class="empty-state" id="reviewEmpty" hidden>
+          <div class="empty-ill">🎉</div>
+          <p class="empty-text">今天要复习的题都完成啦！</p>
+        </div>
+      </section>
     </main>
+  </div>
+</div>
+
+<!-- 模考浮层 -->
+<div id="examOverlay" class="modal-overlay exam-overlay" hidden>
+  <div class="modal exam-modal">
+    <div class="modal-head">
+      <h3 id="examTitle">模考</h3>
+      <span class="exam-timer" id="examTimer">--:--</span>
+      <button class="modal-close" id="examClose" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="examBody"></div>
+    </div>
+    <div class="modal-foot">
+      <span class="hint" id="examHint"></span>
+      <button class="btn primary" id="examSubmit" type="button">交卷</button>
+    </div>
   </div>
 </div>
 

@@ -59,12 +59,15 @@ CREATE TABLE IF NOT EXISTS questions (
     source_file     TEXT NOT NULL DEFAULT '',
     created_at      TEXT NOT NULL DEFAULT '',
     stage           TEXT NOT NULL DEFAULT '',
-    qtype           TEXT NOT NULL DEFAULT ''
+    qtype           TEXT NOT NULL DEFAULT '',
+    images          TEXT NOT NULL DEFAULT '[]',
+    next_review_at  TEXT NOT NULL DEFAULT '',
+    review_interval INTEGER NOT NULL DEFAULT 0
 );
 ";
 
 /// 列名列表（SELECT 显式列出，避免新增列后索引错位）。
-const COLUMNS: &str = "id, text, answer, grade, term, subject, knowledge_points, is_wrong, wrong_reason, mastery, source_file, created_at, stage, qtype";
+const COLUMNS: &str = "id, text, answer, grade, term, subject, knowledge_points, is_wrong, wrong_reason, mastery, source_file, created_at, stage, qtype, images, next_review_at, review_interval";
 
 /// 数据目录：~/.cuotiji（与 Python 版一致）。
 pub fn data_dir() -> PathBuf {
@@ -104,6 +107,19 @@ fn migrate(c: &Connection) -> Result<(), String> {
     }
     if !cols.iter().any(|c| c == "qtype") {
         c.execute("ALTER TABLE questions ADD COLUMN qtype TEXT NOT NULL DEFAULT ''", [])
+            .map_err(|e| e.to_string())?;
+    }
+    // 二期/三期迁移：图片题干 + 复习排期（幂等）
+    if !cols.iter().any(|c| c == "images") {
+        c.execute("ALTER TABLE questions ADD COLUMN images TEXT NOT NULL DEFAULT '[]'", [])
+            .map_err(|e| e.to_string())?;
+    }
+    if !cols.iter().any(|c| c == "next_review_at") {
+        c.execute("ALTER TABLE questions ADD COLUMN next_review_at TEXT NOT NULL DEFAULT ''", [])
+            .map_err(|e| e.to_string())?;
+    }
+    if !cols.iter().any(|c| c == "review_interval") {
+        c.execute("ALTER TABLE questions ADD COLUMN review_interval INTEGER NOT NULL DEFAULT 0", [])
             .map_err(|e| e.to_string())?;
     }
     // 回填：空 stage 按 grade 推断
@@ -187,6 +203,33 @@ pub fn normalize(data: &Map<String, Value>) -> Map<String, Value> {
         .unwrap_or_else(now_iso);
     let id = get_s("id").unwrap_or_else(gen_id);
 
+    // 图片题干：文件名白名单校验（防目录穿越），至多 6 张
+    let images: Vec<Value> = match data.get("images") {
+        Some(Value::Array(arr)) => arr
+            .iter()
+            .filter_map(|v| v.as_str())
+            .filter(|s| is_safe_image_name(s))
+            .take(6)
+            .map(|s| json!(s))
+            .collect(),
+        _ => vec![],
+    };
+
+    // 复习排期：未掌握的题若无排期则排到明天；已掌握清空排期
+    let mastery_str = mastery.as_str().unwrap_or("未掌握").to_string();
+    let (next_review_at, review_interval) = if mastery_str == "已掌握" {
+        (String::new(), 0i64)
+    } else {
+        let existing_at = get_s("nextReviewAt").or_else(|| get_s("next_review_at")).unwrap_or_default();
+        let existing_iv = data.get("reviewInterval").or_else(|| data.get("review_interval"))
+            .and_then(|v| v.as_i64()).unwrap_or(0);
+        if !existing_at.is_empty() {
+            (existing_at, existing_iv)
+        } else {
+            (date_after_days(1), 0)
+        }
+    };
+
     let mut m = Map::new();
     m.insert("id".into(), json!(id));
     m.insert("text".into(), json!(get_s("text").unwrap_or_default()));
@@ -197,12 +240,37 @@ pub fn normalize(data: &Map<String, Value>) -> Map<String, Value> {
     m.insert("knowledgePoints".into(), json!(kps));
     m.insert("isWrong".into(), json!(is_wrong));
     m.insert("wrongReason".into(), json!(get_s("wrongReason").or_else(|| get_s("wrong_reason")).unwrap_or_default()));
-    m.insert("mastery".into(), mastery);
+    m.insert("mastery".into(), json!(mastery_str));
     m.insert("sourceFile".into(), json!(get_s("sourceFile").or_else(|| get_s("source_file")).unwrap_or_default()));
     m.insert("createdAt".into(), json!(created));
     m.insert("stage".into(), json!(stage));
     m.insert("qtype".into(), json!(get_s("qtype").unwrap_or_default()));
+    m.insert("images".into(), json!(images));
+    m.insert("nextReviewAt".into(), json!(next_review_at));
+    m.insert("reviewInterval".into(), json!(review_interval));
     m
+}
+
+/// 图片文件名安全校验：仅允许 [A-Za-z0-9_.-]，不得以 . 开头、不含 ..，扩展名限图片。
+pub fn is_safe_image_name(name: &str) -> bool {
+    if name.is_empty() || name.len() > 100 || name.starts_with('.') || name.contains("..") {
+        return false;
+    }
+    if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-') {
+        return false;
+    }
+    matches!(name.rsplit('.').next(), Some(ext) if matches!(ext, "png" | "jpg" | "jpeg" | "webp"))
+}
+
+/// 今天 + n 天的日期（YYYY-MM-DD）。
+pub fn date_after_days(n: i64) -> String {
+    use time::ext::NumericalDuration;
+    use time::macros::format_description;
+    let fmt = format_description!("[year]-[month]-[day]");
+    let day = time::OffsetDateTime::now_local()
+        .unwrap_or_else(|_| time::OffsetDateTime::now_utc())
+        .date();
+    (day + n.days()).format(&fmt).unwrap_or_default()
 }
 
 /// 对齐 Python datetime.now().isoformat(timespec='seconds')：本地时间，秒精度。
@@ -237,6 +305,11 @@ pub fn row_to_q(row: &rusqlite::Row) -> rusqlite::Result<Map<String, Value>> {
     m.insert("createdAt".into(), json!(get("created_at")?));
     m.insert("stage".into(), json!(get("stage")?));
     m.insert("qtype".into(), json!(get("qtype")?));
+    let images: Vec<Value> = serde_json::from_str(&get("images")?)
+        .unwrap_or_else(|_| vec![]);
+    m.insert("images".into(), json!(images));
+    m.insert("nextReviewAt".into(), json!(get("next_review_at")?));
+    m.insert("reviewInterval".into(), json!(row.get::<&str, i64>("review_interval")?));
     Ok(m)
 }
 
@@ -287,8 +360,9 @@ pub fn list_questions(f: &Filters) -> Result<Vec<Map<String, Value>>, String> {
 fn insert(c: &Connection, q: &Map<String, Value>) -> Result<(), String> {
     c.execute(
         "INSERT OR REPLACE INTO questions (id, text, answer, grade, term, subject, \
-         knowledge_points, is_wrong, wrong_reason, mastery, source_file, created_at, stage, qtype) \
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+         knowledge_points, is_wrong, wrong_reason, mastery, source_file, created_at, stage, qtype, \
+         images, next_review_at, review_interval) \
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         params![
             q["id"].as_str().unwrap_or(""),
             q["text"].as_str().unwrap_or(""),
@@ -304,6 +378,9 @@ fn insert(c: &Connection, q: &Map<String, Value>) -> Result<(), String> {
             q["createdAt"].as_str().unwrap_or(""),
             q["stage"].as_str().unwrap_or(""),
             q["qtype"].as_str().unwrap_or(""),
+            serde_json::to_string(&q["images"]).unwrap_or_else(|_| "[]".into()),
+            q["nextReviewAt"].as_str().unwrap_or(""),
+            q["reviewInterval"].as_i64().unwrap_or(0),
         ],
     )
     .map_err(|e| e.to_string())?;

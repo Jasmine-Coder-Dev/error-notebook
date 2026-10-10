@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
@@ -125,15 +125,54 @@ async fn delete_question(State(_st): State<AppState>, Path(id): Path<String>) ->
 
 async fn export_all() -> Json<Value> {
     let rows = db::list_questions(&db::Filters::default()).unwrap_or_default();
+    // 图片题干：导出时把图片文件读出为 base64 内嵌，跨机迁移自包含
+    let mut images_data = serde_json::Map::new();
+    for q in &rows {
+        if let Some(arr) = q.get("images").and_then(|v| v.as_array()) {
+            for name in arr.iter().filter_map(|v| v.as_str()) {
+                if images_data.contains_key(name) {
+                    continue;
+                }
+                let path = db::data_dir().join("images").join(name);
+                if let Ok(bytes) = std::fs::read(&path) {
+                    use base64::Engine;
+                    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                    let mime = match name.rsplit('.').next().unwrap_or("") {
+                        "png" => "image/png",
+                        "webp" => "image/webp",
+                        _ => "image/jpeg",
+                    };
+                    images_data.insert(name.to_string(), json!(format!("data:{mime};base64,{b64}")));
+                }
+            }
+        }
+    }
     Json(json!({
         "app": "cuotiji",
-        "version": 2,
+        "version": 3,
         "exportedAt": db::now_iso(),
         "questions": rows,
+        "images_data": images_data,
     }))
 }
 
 async fn import_all(body: Json<Value>) -> Result<Json<Value>, ApiError> {
+    // 图片数据落盘还原（存在 images_data 时）
+    if let Some(map) = body.0.get("images_data").and_then(|v| v.as_object()) {
+        let dir = db::data_dir().join("images");
+        std::fs::create_dir_all(&dir).map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "io_error", e.to_string()))?;
+        use base64::Engine;
+        for (name, dataurl) in map {
+            if !db::is_safe_image_name(name) {
+                continue;
+            }
+            if let Some(b64) = dataurl.as_str().and_then(|s| s.split("base64,").nth(1)) {
+                if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(b64) {
+                    let _ = std::fs::write(dir.join(name), bytes);
+                }
+            }
+        }
+    }
     let arr: Option<Vec<Value>> = match &body.0 {
         Value::Array(a) => Some(a.clone()),
         Value::Object(m) => m.get("questions").and_then(|v| v.as_array()).cloned(),
@@ -142,6 +181,64 @@ async fn import_all(body: Json<Value>) -> Result<Json<Value>, ApiError> {
     let arr = arr.ok_or_else(|| ApiError::bad_request("导入内容必须是题目数组或含 questions 字段的对象"))?;
     let inserted = db::replace_all(&arr).map_err(db_err)?;
     Ok(Json(json!({"imported": inserted.len()})))
+}
+
+// ---------------- 图片题干 ----------------
+
+/// 图片目录。
+fn images_dir() -> std::path::PathBuf {
+    db::data_dir().join("images")
+}
+
+/// POST /api/upload/image（multipart：file）→ {"name": "xxx.png"}
+async fn upload_image(
+    mut multipart: axum::extract::Multipart,
+) -> Result<Json<Value>, ApiError> {
+    let mut payload: Option<(Vec<u8>, String)> = None;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError::bad_request(&format!("上传解析失败：{e}")))?
+    {
+        if field.name() == Some("file") {
+            let filename = field.file_name().unwrap_or("").to_lowercase();
+            let ext = filename.rsplit('.').next().unwrap_or("").to_string();
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| ApiError::bad_request(&format!("读取文件失败：{e}")))?;
+            payload = Some((data.to_vec(), ext));
+            break;
+        }
+    }
+    let (bytes, ext) = payload.ok_or_else(|| ApiError::bad_request("缺少 file 字段"))?;
+    if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp") {
+        return Err(ApiError::bad_request("仅支持 png / jpg / webp 图片"));
+    }
+    if bytes.len() > 10 * 1024 * 1024 {
+        return Err(ApiError::bad_request("图片请控制在 10MB 以内"));
+    }
+    let name = format!("{}.{ext}", db::gen_id());
+    let dir = images_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "io_error", e.to_string()))?;
+    std::fs::write(dir.join(&name), &bytes).map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "io_error", e.to_string()))?;
+    Ok(Json(json!({ "name": name })))
+}
+
+/// GET /images/{name} → 图片文件（白名单校验防目录穿越）。
+async fn serve_image(Path(name): Path<String>) -> Result<Response, ApiError> {
+    if !db::is_safe_image_name(&name) {
+        return Err(ApiError::bad_request("非法图片名"));
+    }
+    let path = images_dir().join(&name);
+    let bytes = std::fs::read(&path)
+        .map_err(|_| ApiError::not_found(format!("图片不存在：{name}")))?;
+    let mime = match name.rsplit('.').next().unwrap_or("") {
+        "png" => "image/png",
+        "webp" => "image/webp",
+        _ => "image/jpeg",
+    };
+    Ok(([(header::CONTENT_TYPE, mime)], bytes).into_response())
 }
 
 // ---------------- 配置 ----------------
@@ -177,7 +274,7 @@ async fn save_settings(body: Json<Map<String, Value>>) -> Result<Json<Value>, Ap
     st.insert("base_url".into(), get("base_url").trim().to_string());
     st.insert("model".into(), get("model").trim().to_string());
     st.insert("api_key".into(), api_key);
-    providers::save_settings(&st).map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "io_error", e))?;
+    providers::save_settings(&st).map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "io_error", e.to_string()))?;
     Ok(Json(providers::public_settings()))
 }
 
@@ -430,6 +527,8 @@ pub fn router(catalog: Vec<Value>) -> Router {
         .route("/api/ai/split-check", post(ai_split_check))
         .route("/api/parse/docx", post(parse_docx))
         .route("/api/ai/ocr", post(ai_ocr))
+        .route("/api/upload/image", post(upload_image))
+        .route("/images/{name}", get(serve_image))
         .fallback(crate::server::static_handler)
         .with_state(state)
 }

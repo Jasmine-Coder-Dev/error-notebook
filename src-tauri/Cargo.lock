@@ -911,6 +911,7 @@ name = "error-notebook"
 version = "0.0.2"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "dirs 6.0.0",
  "quick-xml 0.36.2",
  "rand 0.8.8",

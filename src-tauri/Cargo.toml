@@ -27,3 +27,4 @@ rand = "0.8"
 time = { version = "0.3", features = ["formatting", "local-offset", "macros"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 quick-xml = "0.36"
+base64 = "0.22"

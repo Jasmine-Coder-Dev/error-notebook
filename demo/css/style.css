@@ -539,3 +539,45 @@ input:focus, textarea:focus, select:focus { outline: 2px solid color-mix(in srgb
   .toast { max-width: 92vw; bottom: 16px; }
   .hint-tip::after { width: 220px; }
 }
+
+/* ========== 二期/三期：图片题干、趋势图、今日复习、模考 ========== */
+.q-imgs { display: flex; gap: 8px; flex-wrap: wrap; }
+.img-thumb-wrap { position: relative; display: inline-block; }
+.img-thumb {
+  height: 84px; max-width: 180px; object-fit: cover;
+  border-radius: 8px; border: 1px solid var(--border); cursor: zoom-in;
+}
+.img-del {
+  position: absolute; top: -8px; right: -8px;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: none; background: var(--danger); color: #fff;
+  font-size: 14px; line-height: 1; cursor: pointer;
+}
+.paper-imgs { margin: 6px 0; }
+.paper-img { max-width: 260px; max-height: 160px; border: 1px solid var(--border); border-radius: 4px; }
+
+.side-badge {
+  background: var(--danger); color: #fff;
+  font-size: 11px; border-radius: 999px;
+  padding: 1px 7px; margin-left: auto;
+}
+.side-item { position: relative; }
+
+.trend-svg { width: 100%; height: auto; }
+.trend-legend { display: flex; gap: 18px; font-size: 13px; color: var(--muted); margin-top: 6px; }
+.trend-legend .lg { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.lg-blue { background: var(--primary); }
+.lg-green { background: #16a34a; }
+
+.review-answer summary { cursor: pointer; color: var(--muted); font-size: 13px; user-select: none; }
+.review-answer .q-answer { margin-top: 6px; }
+
+.exam-timer {
+  font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 700;
+  color: var(--danger); margin-left: auto; margin-right: 12px;
+}
+.exam-modal { width: 760px; }
+.exam-q { margin-bottom: 18px; }
+.exam-input { margin-top: 8px; }
+.exam-grade { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 14px; }
+.exam-grade span:first-child { color: var(--muted); }

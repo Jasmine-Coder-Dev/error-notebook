@@ -290,6 +290,7 @@
     $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
     if (name === 'bank') renderBank();
     if (name === 'analysis') renderAnalysis();
+    if (name === 'review') renderReview();
   }
   $('#sideNav').addEventListener('click', e => {
     const btn = e.target.closest('.side-item');
@@ -586,7 +587,43 @@
   }
 
   /* ================= 手动录入 ================= */
+  let mImages = []; // 已上传题目配图文件名
+  function renderMImgs() {
+    $('#mImgs').innerHTML = mImages.map(n => `
+      <span class="img-thumb-wrap">
+        <img src="/images/${esc(n)}" class="img-thumb" alt="题目配图">
+        <button type="button" class="img-del" data-name="${esc(n)}" title="删除这张图">×</button>
+      </span>`).join('');
+  }
+
   function initManualForm() {
+    $('#mImgBtn').addEventListener('click', () => $('#mImgFile').click());
+    $('#mImgFile').addEventListener('change', async () => {
+      const files = Array.from($('#mImgFile').files || []);
+      $('#mImgFile').value = '';
+      if (!files.length) return;
+      for (const f of files) {
+        if (f.size > 10 * 1024 * 1024) { toast('「' + f.name + '」超过 10MB，压一压再传'); continue; }
+        const fd = new FormData();
+        fd.append('file', f);
+        try {
+          const resp = await fetch('/api/upload/image', { method: 'POST', body: fd });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || resp.status);
+          mImages.push(data.name);
+        } catch (err) {
+          toast('图片上传失败，换一张试试');
+        }
+      }
+      renderMImgs();
+    });
+    $('#mImgs').addEventListener('click', e => {
+      const del = e.target.closest('.img-del');
+      if (!del) return;
+      mImages = mImages.filter(n => n !== del.dataset.name);
+      renderMImgs();
+    });
+
     $('#manualForm').addEventListener('submit', async e => {
       e.preventDefault();
       const text = $('#mText').value.trim();
@@ -603,10 +640,13 @@
         wrongReason: $('#mReason').value.trim(),
         mastery: '未掌握',
         sourceFile: '手动录入',
-        qtype: $('#mQtype').value
+        qtype: $('#mQtype').value,
+        images: mImages.slice()
       }, cls));
       e.target.reset();
       $('#mWrong').checked = true;
+      mImages = [];
+      renderMImgs();
       await refreshAll();
       updateSteps();
       toast('已保存');
@@ -684,6 +724,8 @@
           ${q.wrongReason ? `<span class="reason-tag">原因：${esc(q.wrongReason)}</span>` : ''}
         </div>
         <div class="q-text">${esc(q.text)}</div>
+        ${(q.images && q.images.length) ? `<div class="q-imgs">${q.images.map(n =>
+          `<img src="/images/${esc(n)}" class="img-thumb" alt="题目配图" loading="lazy">`).join('')}</div>` : ''}
         ${q.answer ? `<div class="q-answer"><b>答案：</b>${esc(q.answer)}</div>` : ''}
         ${q.knowledgePoints.length ? `<div class="q-kps">${q.knowledgePoints.map(k =>
           `<span class="kp-chip" data-kp="${esc(k)}" title="按该知识点筛选">${esc(k)}</span>`).join('')}</div>` : ''}
@@ -865,6 +907,8 @@
     const questions = list.map((q, i) => `
       <div class="paper-q">
         <div class="pq-text"><b>${i + 1}.</b> ${esc(q.text)}</div>
+        ${(q.images && q.images.length) ? `<div class="paper-imgs">${q.images.map(n =>
+          `<img src="/images/${esc(n)}" class="paper-img" alt="">`).join('')}</div>` : ''}
         <div class="answer-blank"></div>
       </div>
     `).join('');
@@ -891,6 +935,36 @@
       </div>`;
   }
 
+  let lastPicked = []; // 最近一次抽题结果（模考复用）
+
+  function weakPick(pool, count) {
+    // 薄弱优先：按知识点「未掌握/复习中错题数」给题加权（错得多的知识点命中率高）
+    const weight = new Map();
+    pool.forEach(q => {
+      if (q.isWrong && q.mastery !== '已掌握') {
+        (q.knowledgePoints || []).forEach(k => weight.set(k, (weight.get(k) || 0) + 1));
+      }
+    });
+    const items = pool.map(q => {
+      const w = 1 + (q.knowledgePoints || []).reduce((s, k) => s + (weight.get(k) || 0), 0);
+      return { q, w };
+    });
+    const picked = [];
+    for (let n = 0; n < count && items.length; n++) {
+      const total = items.reduce((s, it) => s + it.w, 0);
+      let r = Math.random() * total;
+      let idx = 0;
+      for (; idx < items.length; idx++) {
+        r -= items[idx].w;
+        if (r <= 0) break;
+      }
+      if (idx >= items.length) idx = items.length - 1;
+      picked.push(items[idx].q);
+      items.splice(idx, 1);
+    }
+    return picked;
+  }
+
   function generatePaper() {
     const pool = filterQuestions(store.all(), paperFilters());
     if (!pool.length) {
@@ -898,16 +972,19 @@
       $('#paperPreview').innerHTML = '';
       $('#print-area').innerHTML = '';
       $('#btnPrint').disabled = true;
+      lastPicked = [];
       return false;
     }
     const count = Math.max(1, Math.min(parseInt($('#pCount').value, 10) || 10, pool.length));
-    const picked = shuffle(pool).slice(0, count);
+    const weakMode = $('#pWeak').checked;
+    const picked = weakMode ? weakPick(pool, count) : shuffle(pool).slice(0, count);
+    lastPicked = picked;
     const withAnswers = $('#pWithAnswers').checked;
     const html = buildPaperHTML(picked, withAnswers);
     $('#paperPreview').innerHTML = html;
     $('#print-area').innerHTML = html;
     $('#btnPrint').disabled = false;
-    $('#paperHint').textContent = `从 ${pool.length} 道候选题里抽了 ${picked.length} 道${withAnswers ? '，附答案页' : ''}。点「打印」输出试卷。`;
+    $('#paperHint').textContent = `从 ${pool.length} 道候选题里抽了 ${picked.length} 道${weakMode ? '（薄弱知识点优先）' : ''}${withAnswers ? '，附答案页' : ''}。点「打印」输出试卷。`;
     return true;
   }
 
@@ -957,8 +1034,10 @@
 
     $('#anaPanelQtype').hidden = anaTab !== 'qtype';
     $('#anaPanelKp').hidden = anaTab !== 'kp';
+    $('#anaPanelTrend').hidden = anaTab !== 'trend';
 
     if (anaTab === 'qtype') renderQtypeChart(pool);
+    else if (anaTab === 'trend') renderTrendChart(pool);
     else renderKpChart(pool);
 
     // 历史数据补标入口
@@ -1124,6 +1203,229 @@
     toast(`已补标 ${done} 道题的题型`);
   });
 
+  /* ================= 错题趋势（按周/月折线） ================= */
+  let trendMode = 'week'; // week | month
+
+  function bucketKey(iso, mode) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    if (mode === 'month') return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const monday = new Date(d);
+    const day = (d.getDay() + 6) % 7; // 周一为一周开始
+    monday.setDate(d.getDate() - day);
+    return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+  }
+
+  function renderTrendChart(pool) {
+    const el = $('#trendChart');
+    const buckets = new Map(); // key → {added, mastered}
+    pool.forEach(q => {
+      const key = bucketKey(q.createdAt, trendMode);
+      if (!key) return;
+      const b = buckets.get(key) || { added: 0, mastered: 0 };
+      b.added += 1;
+      if (q.mastery === '已掌握') b.mastered += 1;
+      buckets.set(key, b);
+    });
+    const keys = [...buckets.keys()].sort().slice(-12); // 最近 12 个周期
+    if (!keys.length) {
+      el.innerHTML = '<p class="chart-empty">还没有带日期的错题，录入后这里会显示变化趋势。</p>';
+      return;
+    }
+    const W = 640, H = 220, PAD = 34;
+    const maxAdded = Math.max(1, ...keys.map(k => buckets.get(k).added));
+    const x = i => PAD + (keys.length === 1 ? (W - 2 * PAD) / 2 : i * (W - 2 * PAD) / (keys.length - 1));
+    const yAdded = v => H - PAD - (v / maxAdded) * (H - 2 * PAD);
+    const yRate = v => H - PAD - v * (H - 2 * PAD); // 0~1
+    const pts = (fn) => keys.map((k, i) => `${x(i)},${fn(k)}`).join(' ');
+    const addedPts = pts(k => yAdded(buckets.get(k).added));
+    const ratePts = pts(k => yRate(buckets.get(k).mastered / buckets.get(k).added));
+    const labels = keys.map((k, i) => {
+      const short = trendMode === 'month' ? k.slice(2, 7) : k.slice(5);
+      return `<text x="${x(i)}" y="${H - 10}" font-size="10" text-anchor="middle" fill="var(--muted)">${esc(short)}</text>`;
+    }).join('');
+    const addedDots = keys.map((k, i) =>
+      `<circle cx="${x(i)}" cy="${yAdded(buckets.get(k).added)}" r="3.5" fill="var(--primary)"><title>${esc(k)}：新增错题 ${buckets.get(k).added} 道</title></circle>`).join('');
+    const rateDots = keys.map((k, i) => {
+      const b = buckets.get(k);
+      const pct = Math.round(100 * b.mastered / b.added);
+      return `<circle cx="${x(i)}" cy="${yRate(b.mastered / b.added)}" r="3.5" fill="#16a34a"><title>${esc(k)}：订正率 ${pct}%</title></circle>`;
+    }).join('');
+    el.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" class="trend-svg" role="img" aria-label="错题趋势图">
+        ${labels}
+        <polyline points="${addedPts}" fill="none" stroke="var(--primary)" stroke-width="2.5"/>
+        <polyline points="${ratePts}" fill="none" stroke="#16a34a" stroke-width="2" stroke-dasharray="5 4"/>
+        ${addedDots}${rateDots}
+      </svg>
+      <div class="trend-legend">
+        <span><i class="lg lg-blue"></i>新增错题数</span>
+        <span><i class="lg lg-green"></i>订正率（已掌握占比）</span>
+      </div>`;
+  }
+
+  $('#btnTrendWeek').addEventListener('click', () => {
+    trendMode = 'week';
+    $('#btnTrendWeek').classList.add('active');
+    $('#btnTrendMonth').classList.remove('active');
+    renderAnalysis();
+  });
+  $('#btnTrendMonth').addEventListener('click', () => {
+    trendMode = 'month';
+    $('#btnTrendMonth').classList.add('active');
+    $('#btnTrendWeek').classList.remove('active');
+    renderAnalysis();
+  });
+
+  /* ================= 今日复习（间隔重复 1/3/7/15 天） ================= */
+  const REVIEW_STEPS = [1, 3, 7, 15];
+
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function dueQuestions() {
+    const today = todayStr();
+    return store.all().filter(q =>
+      q.isWrong && q.mastery !== '已掌握' && q.nextReviewAt && q.nextReviewAt <= today);
+  }
+
+  function renderReview() {
+    const list = dueQuestions();
+    const badge = $('#revBadge');
+    badge.textContent = list.length > 99 ? '99+' : list.length;
+    badge.hidden = list.length === 0;
+    $('#revCount').textContent = `${list.length} 题`;
+    $('#reviewEmpty').hidden = list.length !== 0;
+    $('#reviewList').innerHTML = list.map(q => `
+      <div class="q-card" data-id="${esc(q.id)}">
+        <div class="q-badges">
+          <span class="badge">${esc(q.stage || stageOfGrade(q.grade))}</span>
+          ${q.grade ? `<span class="badge">${esc(q.grade)}</span>` : ''}
+          ${q.subject ? `<span class="badge">${esc(q.subject)}</span>` : ''}
+          ${q.qtype ? `<span class="badge">${esc(q.qtype)}</span>` : ''}
+          <span class="badge wrong">第 ${(q.reviewInterval || 0) + 1} 次复习</span>
+        </div>
+        <div class="q-text">${esc(q.text)}</div>
+        ${(q.images && q.images.length) ? `<div class="q-imgs">${q.images.map(n =>
+          `<img src="/images/${esc(n)}" class="img-thumb" alt="">`).join('')}</div>` : ''}
+        <details class="review-answer"><summary>看答案</summary><div class="q-answer">${esc(q.answer || '（暂无答案）')}</div></details>
+        <div class="q-foot">
+          <span class="hint">先自己动笔做，再对答案</span>
+          <span class="spacer"></span>
+          <button type="button" class="btn small rev-again">再练一遍</button>
+          <button type="button" class="btn small rev-known" style="color:var(--ok);border-color:var(--ok)">已掌握</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  $('#reviewList').addEventListener('click', async e => {
+    const again = e.target.closest('.rev-again');
+    const known = e.target.closest('.rev-known');
+    if (!again && !known) return;
+    const id = (again || known).closest('.q-card').dataset.id;
+    const q = store.get(id);
+    if (!q) return;
+    if (known) {
+      await store.update(id, { mastery: '已掌握' });
+      toast('很好，这题不再安排复习');
+    } else {
+      const step = REVIEW_STEPS[Math.min((q.reviewInterval || 0) + 1, REVIEW_STEPS.length - 1)];
+      const d = new Date();
+      d.setDate(d.getDate() + step);
+      const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      await store.update(id, { mastery: '复习中', reviewInterval: (q.reviewInterval || 0) + 1, nextReviewAt: next });
+      toast(`${step} 天后再见`);
+    }
+    await refreshAll();
+  });
+
+  /* ================= 模考模式 ================= */
+  let examTimer = null;
+
+  $('#btnExam').addEventListener('click', () => {
+    if (!lastPicked.length && !generatePaper()) return;
+    openExam(lastPicked);
+  });
+
+  function openExam(list) {
+    const minutes = Math.max(5, list.length * 2);
+    $('#examTitle').textContent = `模考 · ${list.length} 题`;
+    $('#examHint').textContent = `每题约 2 分钟，共 ${minutes} 分钟。做完点「交卷」对照答案自己判分。`;
+    $('#examBody').innerHTML = list.map((q, i) => `
+      <div class="exam-q" data-i="${i}">
+        <div class="pq-text"><b>${i + 1}.</b> ${esc(q.text)}</div>
+        ${(q.images && q.images.length) ? `<div class="q-imgs">${q.images.map(n =>
+          `<img src="/images/${esc(n)}" class="img-thumb" alt="">`).join('')}</div>` : ''}
+        <textarea class="exam-input" rows="2" placeholder="在这里打草稿或写答案（不用判分，交卷后自己对照）"></textarea>
+      </div>
+    `).join('');
+    $('#examSubmit').textContent = '交卷';
+    $('#examSubmit').dataset.stage = 'answer';
+    $('#examOverlay').hidden = false;
+    const deadline = Date.now() + minutes * 60 * 1000;
+    clearInterval(examTimer);
+    examTimer = setInterval(() => {
+      const left = Math.max(0, deadline - Date.now());
+      const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
+      $('#examTimer').textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      if (left === 0) {
+        clearInterval(examTimer);
+        toast('时间到！点「交卷」对照答案');
+      }
+    }, 500);
+  }
+
+  $('#examClose').addEventListener('click', () => {
+    clearInterval(examTimer);
+    $('#examOverlay').hidden = true;
+  });
+
+  $('#examSubmit').addEventListener('click', async () => {
+    const btn = $('#examSubmit');
+    if (btn.dataset.stage === 'answer') {
+      // 交卷 → 展示答案与自评
+      clearInterval(examTimer);
+      $('#examBody').innerHTML = lastPicked.map((q, i) => `
+        <div class="exam-q">
+          <div class="pq-text"><b>${i + 1}.</b> ${esc(q.text)}</div>
+          <div class="q-answer"><b>参考答案：</b>${esc(q.answer || '（暂无答案）')}</div>
+          <div class="exam-grade">
+            <span>这题你会了吗？</span>
+            <button type="button" class="btn small exam-yes" data-id="${esc(q.id)}">会</button>
+            <button type="button" class="btn danger small exam-no" data-id="${esc(q.id)}">不会</button>
+          </div>
+        </div>
+      `).join('');
+      btn.textContent = '完成';
+      btn.dataset.stage = 'done';
+      $('#examHint').textContent = '逐题自评：「不会」的题会自动安排明天复习。';
+      return;
+    }
+    // 完成 → 关闭
+    clearInterval(examTimer);
+    $('#examOverlay').hidden = true;
+    await refreshAll();
+  });
+
+  $('#examBody').addEventListener('click', async e => {
+    const yes = e.target.closest('.exam-yes');
+    const no = e.target.closest('.exam-no');
+    if (!yes && !no) return;
+    const id = (yes || no).dataset.id;
+    const row = (yes || no).closest('.exam-grade');
+    row.innerHTML = yes
+      ? '<span style="color:var(--ok)">已标记：会 ✓</span>'
+      : '<span style="color:var(--danger)">已标记：不会，明天再练</span>';
+    if (yes) {
+      await store.update(id, { mastery: '已掌握' });
+    } else {
+      await store.update(id, { mastery: '未掌握', reviewInterval: 0, nextReviewAt: todayStr() });
+    }
+  });
+
   /* ================= 数据管理 ================= */
   $('#btnExport').addEventListener('click', async () => {
     let text;
@@ -1220,6 +1522,7 @@
     ['f', 'p', 'a'].forEach(refreshGradeSubjectSelects);
     renderBank();
     renderAnalysis();
+    renderReview();
   }
 
   CJT.refresh = refreshAll;
