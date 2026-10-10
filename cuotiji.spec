@@ -1,5 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller 配置：onefile、windowed（无控制台黑窗）。
+"""PyInstaller 配置：输出 Tauri sidecar 二进制 python-server。
+
+产物由 build_macos.sh / build_windows.bat 放到
+src-tauri/binaries/python-server-<target-triple>，供 Tauri externalBin 嵌入。
 
 datas：demo/ 整个静态目录 + server/catalog.json 打进包内，
 运行时由 launcher.py 通过 sys._MEIPASS 定位。
@@ -37,14 +40,14 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='cuotiji',
+    name='python-server',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

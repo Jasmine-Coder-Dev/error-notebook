@@ -12,5 +12,10 @@ __pycache__/
 dist/
 build/
 
+# Tauri
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/gen/
+
 # 系统/编辑器
 .DS_Store

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>错题集</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: #f4f6fa; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #2c3e50;
+  }
+  .spinner {
+    width: 42px; height: 42px; border-radius: 50%;
+    border: 4px solid #d5dde8; border-top-color: #3b7ddd;
+    animation: spin 0.9s linear infinite; margin-bottom: 20px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  h1 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  p { font-size: 13px; color: #8a97a8; }
+</style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <h1>正在启动错题集</h1>
+  <p>本地服务加载中，请稍候…</p>
+</body>
+</html>

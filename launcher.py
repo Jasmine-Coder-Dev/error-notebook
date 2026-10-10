@@ -1,14 +1,15 @@
-"""桌面应用入口（普通用户双击即用）。
+"""桌面应用入口。
 
-- 自动探测空闲端口（bind 0）；
-- 线程内启动 uvicorn，日志写入 ~/.cuotiji/app.log；
-- 延时后自动用默认浏览器打开页面；
-- 兼容 PyInstaller frozen 环境：静态资源 / catalog.json 从 sys._MEIPASS 定位。
+两种模式：
+- 开发者模式（无参数）：自动探测空闲端口、启动 uvicorn、自动打开浏览器；
+- Sidecar 模式（--port N，由 Tauri 壳传入）：固定端口、不开浏览器，
+  日志仍写 ~/.cuotiji/app.log，退出由壳负责 kill。
 
 运行方式：
-    源码模式：  python launcher.py
-    打包产物：  双击 dist/cuotiji（Windows 为 cuotiji.exe）
+    开发者模式：  python launcher.py
+    Sidecar 模式： python-server --port 8000（PyInstaller 产物）
 """
+import argparse
 import logging
 import os
 import socket
@@ -50,14 +51,19 @@ def find_free_port() -> int:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description='错题集本地服务入口')
+    parser.add_argument('--port', type=int, default=0,
+                        help='固定端口（Tauri sidecar 模式）；0 表示自动探测（开发者模式）')
+    args = parser.parse_args()
+
     log = setup_logging()
-    log.info('启动错题集桌面应用，资源目录：%s，数据目录：%s',
-             BASE_DIR, os.environ['CUOTIJI_DATA_DIR'])
+    log.info('启动错题集本地服务，资源目录：%s，数据目录：%s，sidecar=%s',
+             BASE_DIR, os.environ['CUOTIJI_DATA_DIR'], bool(args.port))
 
     # 延迟导入：server.main 读取上面的环境变量决定资源路径
     from server.main import app
 
-    port = find_free_port()
+    port = args.port or find_free_port()
     url = f'http://127.0.0.1:{port}/'
     log.info('本地服务地址：%s', url)
 
@@ -65,7 +71,12 @@ def main() -> None:
                             log_level='info', log_config=None)
     server = uvicorn.Server(config)
 
-    # 服务起来后再开浏览器（先做一次连通探测）
+    if args.port:
+        # Sidecar 模式：不开浏览器，退出由 Tauri 壳 kill
+        server.run()
+        return
+
+    # 开发者模式：服务起来后再开浏览器（先做一次连通探测）
     def open_browser() -> None:
         for _ in range(30):
             try:

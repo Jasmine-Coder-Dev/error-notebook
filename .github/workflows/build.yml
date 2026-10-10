@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  pyinstaller:
+  tauri:
     strategy:
       fail-fast: false
       matrix:
@@ -20,15 +20,40 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: pip install -r server/requirements.txt -r build-requirements.txt
 
-      - name: Build with PyInstaller
+      - name: Build python-server sidecar (PyInstaller)
         run: pyinstaller --clean -y cuotiji.spec
 
-      - name: Upload artifact
+      - name: Stage sidecar binary for Tauri
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            cp dist/python-server "src-tauri/binaries/python-server-aarch64-apple-darwin"
+            chmod +x "src-tauri/binaries/python-server-aarch64-apple-darwin"
+          else
+            cp dist/python-server.exe "src-tauri/binaries/python-server-x86_64-pc-windows-msvc.exe"
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps (none) & Tauri CLI
+        run: cargo install tauri-cli --version '^2'
+
+      - name: Tauri build
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: ./src-tauri
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: cuotiji-${{ matrix.os }}
-          path: dist/cuotiji*
+          name: cuotiji-${{ runner.os }}
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app
+            src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "最小权限：壳本身不暴露任何能力给前端页面",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

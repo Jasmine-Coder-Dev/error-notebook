@@ -76,6 +76,12 @@ class SplitIn(BaseModel):
     subject: str = ""
 
 
+@app.get("/healthz")
+def healthz():
+    """健康检查（Tauri sidecar 就绪探测用）。"""
+    return {"ok": True}
+
+
 # ---------------- 题目 CRUD（SQLite） ----------------
 
 @app.get("/api/questions")
