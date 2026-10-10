@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- 液态玻璃风格图标（macOS 26 规范）：半透明玻璃层叠 + 高光内描边 + 柔光
+       VAR=light 浅色版 / VAR=dark 深色版，用占位符替换底色 -->
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbfaff"/>
+      <stop offset="1" stop-color="#e8ecf6"/>
+    </linearGradient>
+    <linearGradient id="glassGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.38"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.65"/>
+      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.30"/>
+    </linearGradient>
+  </defs>
+
+  <!-- squircle 画布 -->
+  <rect x="0" y="0" width="1024" height="1024" rx="232" fill="url(#bgGrad)"/>
+  <!-- 玻璃高光斜切 -->
+  <path d="M 0 232 Q 0 0 232 0 L 792 0 Q 1024 0 1024 232 L 1024 420 L 0 640 Z" fill="url(#sheen)" opacity="0.35"/>
+
+  <!-- 玻璃笔记本主体 -->
+  <g>
+    <rect x="236" y="210" width="552" height="640" rx="52" fill="url(#glassGrad)" stroke="#ffffff" stroke-opacity="0.65" stroke-width="6"/>
+    <rect x="236" y="210" width="552" height="640" rx="52" fill="none" stroke="#3b6fe0" stroke-opacity="0.9" stroke-width="10"/>
+    <!-- 书脊 -->
+    <rect x="236" y="210" width="34" height="640" rx="17" fill="#3b6fe0" opacity="0.92"/>
+    <!-- 装订环 -->
+    <g fill="INK">
+      <circle cx="300" cy="330" r="18"/>
+      <circle cx="300" cy="530" r="18"/>
+      <circle cx="300" cy="730" r="18"/>
+    </g>
+    <!-- 内页文字线 -->
+    <g stroke="INK" stroke-width="14" stroke-linecap="round" opacity="0.55">
+      <line x1="360" y1="400" x2="690" y2="400"/>
+      <line x1="360" y1="470" x2="630" y2="470"/>
+    </g>
+    <!-- 错题红线 -->
+    <line x1="360" y1="580" x2="680" y2="580" stroke="#ef4444" stroke-width="16" stroke-linecap="round" opacity="0.9"/>
+  </g>
+
+  <!-- 红 ✗ / 绿 ✓ 双角标（保持品牌记忆点） -->
+  <g transform="translate(340,610)">
+    <circle cx="0" cy="0" r="112" fill="#ef4444" opacity="0.95"/>
+    <circle cx="0" cy="0" r="112" fill="url(#glassGrad)" opacity="0.25"/>
+    <g stroke="#fff" stroke-width="28" stroke-linecap="round">
+      <line x1="-44" y1="-44" x2="44" y2="44"/>
+      <line x1="44" y1="-44" x2="-44" y2="44"/>
+    </g>
+  </g>
+  <g transform="translate(700,760)">
+    <circle cx="0" cy="0" r="100" fill="#16a34a" opacity="0.95"/>
+    <circle cx="0" cy="0" r="100" fill="url(#glassGrad)" opacity="0.25"/>
+    <path d="M -44 6 L -10 40 L 48 -30" fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

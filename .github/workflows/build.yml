@@ -26,6 +26,12 @@ jobs:
         with:
           projectPath: ./src-tauri
 
+      - name: macOS icon dual-appearance injection
+        if: runner.os == 'macOS'
+        run: |
+          APP=$(ls -d src-tauri/target/release/bundle/macos/*.app | head -1)
+          bash scripts/macos-icon-variants.sh "$APP" || true
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:

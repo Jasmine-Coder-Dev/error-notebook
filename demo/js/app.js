@@ -1035,9 +1035,11 @@
     $('#anaPanelQtype').hidden = anaTab !== 'qtype';
     $('#anaPanelKp').hidden = anaTab !== 'kp';
     $('#anaPanelTrend').hidden = anaTab !== 'trend';
+    $('#anaPanelGraph').hidden = anaTab !== 'graph';
 
     if (anaTab === 'qtype') renderQtypeChart(pool);
     else if (anaTab === 'trend') renderTrendChart(pool);
+    else if (anaTab === 'graph') renderGraphChart(pool);
     else renderKpChart(pool);
 
     // 历史数据补标入口
@@ -1201,6 +1203,88 @@
     await store.reload();
     renderAnalysis();
     toast(`已补标 ${done} 道题的题型`);
+  });
+
+  /* ================= 知识图谱（旭日图，纯 SVG） ================= */
+  // 掌握度 → 颜色：0=红(未掌握) 0.5=黄 1=绿(已掌握)，HSL 插值
+  function masteryColor(mastered, total) {
+    if (!total) return 'var(--muted)';
+    const ratio = mastered / total;
+    const hue = ratio * 120; // 0红 → 120绿
+    return `hsl(${Math.round(hue)}, 62%, 52%)`;
+  }
+
+  function arcPath(cx, cy, r0, r1, a0, a1) {
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const p = (r, a) => `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`;
+    return `M ${p(r0, a0)} A ${r0} ${r0} 0 ${large} 1 ${p(r0, a1)} L ${p(r1, a1)} A ${r1} ${r1} 0 ${large} 0 ${p(r1, a0)} Z`;
+  }
+
+  function renderGraphChart(pool) {
+    const el = $('#graphChart');
+    // 聚合：科目 → 知识点 → {total, mastered}
+    const bySubject = new Map();
+    pool.forEach(q => {
+      const subject = q.subject || '未分类科目';
+      const kps = q.knowledgePoints.length ? q.knowledgePoints : ['未标知识点'];
+      kps.forEach(kp => {
+        const m = bySubject.get(subject) || new Map();
+        const node = m.get(kp) || { total: 0, mastered: 0 };
+        node.total += 1;
+        if (q.mastery === '已掌握') node.mastered += 1;
+        m.set(kp, node);
+        bySubject.set(subject, m);
+      });
+    });
+    const grandTotal = [...bySubject.values()].reduce((s, m) => s + [...m.values()].reduce((x, n) => x + n.total, 0), 0);
+    if (!grandTotal) {
+      el.innerHTML = '<p class="chart-empty">还没有知识点数据。录入错题时让 AI 打上知识点标签，这里就能看到全貌。</p>';
+      return;
+    }
+    const SIZE = 460, CX = SIZE / 2, CY = SIZE / 2;
+    const R_IN = 66, R_SUBJECT = 128, R_KP = 196;
+    let angle = -Math.PI / 2;
+    let svg = `<circle cx="${CX}" cy="${CY}" r="${R_IN - 8}" fill="var(--surface-3)"/>
+      <text x="${CX}" y="${CY - 6}" text-anchor="middle" font-size="22" font-weight="700" fill="var(--text)">${grandTotal}</text>
+      <text x="${CX}" y="${CY + 16}" text-anchor="middle" font-size="12" fill="var(--muted)">道错题</text>`;
+    const legend = [];
+    [...bySubject.entries()].forEach(([subject, kps], si) => {
+      const subTotal = [...kps.values()].reduce((s, n) => s + n.total, 0);
+      const subMastered = [...kps.values()].reduce((s, n) => s + n.mastered, 0);
+      const span = subTotal / grandTotal * Math.PI * 2;
+      const a0 = angle, a1 = angle + span;
+      const hue = (si * 47) % 360;
+      svg += `<path d="${arcPath(CX, CY, R_IN, R_SUBJECT, a0, a1)}" fill="hsl(${hue},45%,58%)" stroke="var(--card)" stroke-width="1.5"><title>${esc(subject)}：${subTotal} 道错题</title></path>`;
+      // 科目标签（扇区中线外侧）
+      const mid = (a0 + a1) / 2;
+      const lx = CX + (R_IN + R_SUBJECT) / 2 * Math.cos(mid);
+      const ly = CY + (R_IN + R_SUBJECT) / 2 * Math.sin(mid);
+      if (span > 0.28) {
+        svg += `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="11" fill="#fff" font-weight="600">${esc(subject.length > 6 ? subject.slice(0, 5) + '…' : subject)}</text>`;
+      }
+      // 外环：知识点
+      let ka = a0;
+      [...kps.entries()].sort((a, b) => b[1].total - a[1].total).forEach(([kp, node]) => {
+        const kspan = node.total / subTotal * span;
+        const color = masteryColor(node.mastered, node.total);
+        svg += `<path class="graph-kp" d="${arcPath(CX, CY, R_SUBJECT + 2, R_KP, ka, ka + kspan)}" fill="${color}" fill-opacity="0.88" stroke="var(--card)" stroke-width="1" data-kp="${esc(kp)}" style="cursor:pointer"><title>${esc(kp)}：${node.total} 道${node.mastered ? `（已掌握 ${node.mastered}）` : ''}</title></path>`;
+        ka += kspan;
+      });
+      legend.push({ subject, total: subTotal, color: `hsl(${hue},45%,58%)`, mastered: subMastered });
+      angle = a1;
+    });
+    el.innerHTML = `<svg viewBox="0 0 ${SIZE} ${SIZE}" class="graph-svg" role="img" aria-label="知识图谱">${svg}</svg>
+      <div class="trend-legend">${legend.slice(0, 8).map(l =>
+        `<span><i class="lg" style="background:${l.color}"></i>${esc(l.subject)} ${l.total} 道（绿=${l.mastered} 已掌握）</span>`).join('')}</div>`;
+  }
+
+  $('#graphChart').addEventListener('click', e => {
+    const seg = e.target.closest('.graph-kp');
+    if (!seg) return;
+    $('#fKp').value = seg.dataset.kp;
+    drillUncat = false;
+    switchView('bank');
+    renderBank();
   });
 
   /* ================= 错题趋势（按周/月折线） ================= */

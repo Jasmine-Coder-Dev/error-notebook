@@ -57,6 +57,25 @@ body {
   line-height: 1.6;
 }
 
+/* ===== 系统材质（方案 §8.3）：窗口透明，侧栏露出系统玻璃/云母 =====
+   window-vibrancy 要求 html/body 透明；未启用材质的平台（Linux/构建异常）由
+   [data-platform] 兜底回退不透明底。 */
+html[data-platform="macos"] body,
+html[data-platform="windows"] body { background: transparent; }
+html:not([data-platform]) body,
+html[data-platform="linux"] body { background: var(--bg); }
+
+html[data-platform="macos"] .sidebar,
+html[data-platform="windows"] .sidebar {
+  background: transparent !important;  /* 露出系统材质 */
+  -webkit-backdrop-filter: none;       /* 系统级效果已含模糊，避免双重 */
+  backdrop-filter: none;
+}
+html:not([data-platform]) .sidebar,
+html[data-platform="linux"] .sidebar {
+  background: var(--glass-bg); /* 兜底：Web 层玻璃 */
+}
+
 /* ========== 布局：左侧导航 + 内容区 ========== */
 .shell { display: flex; min-height: 100vh; }
 
@@ -564,6 +583,9 @@ input:focus, textarea:focus, select:focus { outline: 2px solid color-mix(in srgb
 .side-item { position: relative; }
 
 .trend-svg { width: 100%; height: auto; }
+.graph-wrap { display: flex; flex-direction: column; align-items: center; }
+.graph-svg { width: 100%; max-width: 480px; height: auto; }
+.graph-kp:hover { fill-opacity: 1; }
 .trend-legend { display: flex; gap: 18px; font-size: 13px; color: var(--muted); margin-top: 6px; }
 .trend-legend .lg { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
 .lg-blue { background: var(--primary); }

@@ -7,6 +7,7 @@
     "frontendDist": "./frontend-placeholder"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
@@ -16,12 +17,8 @@
         "minWidth": 900,
         "minHeight": 600,
         "resizable": true,
-        "backgroundColor": "#f4f6fa",
-        "windowEffects": {
-          "effects": ["sidebar"],
-          "state": "active",
-          "radius": 12.0
-        }
+        "transparent": true,
+        "backgroundColor": "#00000000"
       }
     ],
     "security": {

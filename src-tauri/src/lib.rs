@@ -81,6 +81,38 @@ pub fn run() {
             if port > 0 {
                 log_line(&format!("本地服务地址：http://127.0.0.1:{port}/"));
                 if let Some(window) = app.get_webview_window("main") {
+                    // 平台标记（CSS 按平台适配材质/兜底）
+                    let platform = if cfg!(target_os = "macos") {
+                        "macos"
+                    } else if cfg!(target_os = "windows") {
+                        "windows"
+                    } else {
+                        "linux"
+                    };
+                    let _ = window.eval(format!("document.documentElement.dataset.platform='{platform}'"));
+                    // 系统级窗口材质（方案 §8.3）：
+                    // macOS 26+ 液态玻璃（NSGlassEffectView，与系统同源）；旧 macOS 回退 NSVisualEffectView
+                    #[cfg(target_os = "macos")]
+                    {
+                        use window_vibrancy::{apply_liquid_glass, apply_vibrancy, LiquidGlassOptions, NSGlassEffectViewStyle, NSVisualEffectMaterial};
+                        let glass = LiquidGlassOptions::new(NSGlassEffectViewStyle::Clear)
+                            .radius(20.0)
+                            .opaque(false);
+                        if apply_liquid_glass(&window, glass).is_err() {
+                            let _ = apply_vibrancy(&window, NSVisualEffectMaterial::Sidebar, None, None);
+                            log_line("液态玻璃不可用（macOS < 26），已回退 sidebar vibrancy");
+                        } else {
+                            log_line("已启用 macOS 液态玻璃");
+                        }
+                    }
+                    // Windows 11 Mica（Win10 自动跳过）
+                    #[cfg(target_os = "windows")]
+                    {
+                        use window_vibrancy::apply_mica;
+                        if apply_mica(&window, false).is_ok() {
+                            log_line("已启用 Windows Mica");
+                        }
+                    }
                     let url: tauri::Url = format!("http://127.0.0.1:{port}/")
                         .parse()
                         .expect("无效的本地服务 URL");

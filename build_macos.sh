@@ -16,6 +16,11 @@ if ! cargo tauri --version >/dev/null 2>&1; then
 fi
 (cd src-tauri && cargo tauri build)
 
+# macOS 图标双外观注入（有完整 Xcode 时生效，无则自动跳过）
+if [ -d "src-tauri/target/release/bundle/macos/错题集.app" ]; then
+  bash scripts/macos-icon-variants.sh "src-tauri/target/release/bundle/macos/错题集.app" || true
+fi
+
 echo ""
 echo "构建完成："
 echo "  .app: src-tauri/target/release/bundle/macos/错题集.app"

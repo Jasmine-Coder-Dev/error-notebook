@@ -925,6 +925,7 @@ dependencies = [
  "tauri-build",
  "time",
  "tokio",
+ "window-vibrancy",
  "zip",
 ]
 

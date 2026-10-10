@@ -238,6 +238,7 @@
               <button class="ana-tab active" data-ana="qtype" type="button">题型统计</button>
               <button class="ana-tab" data-ana="kp" type="button">知识点统计</button>
               <button class="ana-tab" data-ana="trend" type="button">错题趋势</button>
+              <button class="ana-tab" data-ana="graph" type="button">知识图谱</button>
             </div>
           </div>
         </div>
@@ -290,6 +291,15 @@
           </div>
           <div id="trendChart"></div>
           <p class="hint">折线越高表示当期新增错题越多；绿色是订正率（已掌握的比例）。偶尔波动很正常，连续上升才需要重点关注。</p>
+        </div>
+
+        <!-- 知识图谱（旭日图） -->
+        <div class="card ana-panel" id="anaPanelGraph" hidden>
+          <div class="panel-head">
+            <h3>哪些知识点错得多、还没补上</h3>
+          </div>
+          <div id="graphChart" class="graph-wrap"></div>
+          <p class="hint">圆环越宽的科目错题越多；颜色偏红＝还没掌握，偏绿＝已经补上了。点最外圈的知识点名字，可以直接去看这些错题。</p>
         </div>
 
         <div id="analysisEmpty" class="empty-state" hidden>
