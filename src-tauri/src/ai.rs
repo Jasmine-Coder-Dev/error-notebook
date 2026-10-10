@@ -21,13 +21,38 @@ pub async fn chat(base_url: &str, api_key: &str, model: &str, messages: Vec<Valu
         return Err(AiError::new("config_error", "未配置 base_url".into()));
     }
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+    let content = chat_raw(base_url, api_key, model, messages, max_tokens, &url).await?;
+    Ok(content)
+}
+
+/// 视觉识别（OpenAI 兼容 image_url 格式）：messages 的 user content 为
+/// [{type:"text"},{type:"image_url",image_url:{url:"data:image/...;base64,..."}}]。
+pub async fn vision_chat(base_url: &str, api_key: &str, model: &str,
+                         prompt: &str, image_data_url: &str,
+                         max_tokens: u32) -> Result<String, AiError> {
+    if base_url.is_empty() {
+        return Err(AiError::new("config_error", "未配置 base_url".into()));
+    }
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+    let messages = vec![json!({
+        "role": "user",
+        "content": [
+            { "type": "text", "text": prompt },
+            { "type": "image_url", "image_url": { "url": image_data_url } }
+        ]
+    })];
+    chat_raw(base_url, api_key, model, messages, max_tokens, &url).await
+}
+
+async fn chat_raw(_base_url: &str, api_key: &str, model: &str, messages: Vec<Value>,
+                  max_tokens: u32, url: &str) -> Result<String, AiError> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
         .build()
         .map_err(|e| AiError::new("network_error", format!("连接厂商接口失败：{}", e)))?;
 
     let resp = client
-        .post(&url)
+        .post(url)
         .bearer_auth(api_key)
         .json(&json!({
             "model": model,

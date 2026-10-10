@@ -4,6 +4,7 @@
 pub mod ai;
 pub mod api;
 pub mod db;
+pub mod parse_docx;
 pub mod prompts;
 pub mod providers;
 pub mod server;

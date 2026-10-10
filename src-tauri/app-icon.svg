@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- squircle 画布：米白底 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fdfcf8"/>
+      <stop offset="1" stop-color="#f0ede4"/>
+    </linearGradient>
+    <linearGradient id="cover" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b6fe0"/>
+      <stop offset="1" stop-color="#2b55b8"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="230" fill="url(#bg)"/>
+
+  <!-- 笔记本主体（靛蓝封面） -->
+  <rect x="216" y="196" width="592" height="680" rx="48" fill="url(#cover)"/>
+  <!-- 书脊装饰线 -->
+  <rect x="216" y="196" width="36" height="680" rx="18" fill="#1e40af" opacity="0.55"/>
+  <!-- 装订环 -->
+  <g fill="#e8edf7">
+    <circle cx="284" cy="320" r="20"/>
+    <circle cx="284" cy="524" r="20"/>
+    <circle cx="284" cy="728" r="20"/>
+  </g>
+
+  <!-- 内页（错题行意象：三行文字线 + 一道错题） -->
+  <rect x="356" y="288" width="380" height="470" rx="24" fill="#ffffff"/>
+  <g stroke="#c7cdd9" stroke-width="16" stroke-linecap="round">
+    <line x1="400" y1="368" x2="692" y2="368"/>
+    <line x1="400" y1="452" x2="640" y2="452"/>
+  </g>
+  <!-- 错题行：红线勾销 -->
+  <line x1="400" y1="560" x2="672" y2="560" stroke="#ef4444" stroke-width="18" stroke-linecap="round"/>
+
+  <!-- 红色 ✗ 角标（左下，叠在页面边缘） -->
+  <g transform="translate(328,596)">
+    <circle cx="0" cy="0" r="118" fill="#ef4444"/>
+    <g stroke="#ffffff" stroke-width="30" stroke-linecap="round">
+      <line x1="-48" y1="-48" x2="48" y2="48"/>
+      <line x1="48" y1="-48" x2="-48" y2="48"/>
+    </g>
+  </g>
+  <!-- 绿色 ✓ 角标（右下） -->
+  <g transform="translate(700,742)">
+    <circle cx="0" cy="0" r="104" fill="#16a34a"/>
+    <path d="M -46 6 L -12 42 L 50 -30" fill="none" stroke="#ffffff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

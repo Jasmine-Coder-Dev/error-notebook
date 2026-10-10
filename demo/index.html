@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
   <title>学生错题集</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -18,6 +19,7 @@
       <button class="tab" data-view="analysis">知识点分析</button>
     </nav>
     <div class="data-actions">
+      <button class="btn ghost" id="btnTheme" type="button" title="切换外观：自动 / 浅色 / 深色">🌗 外观</button>
       <button class="btn ghost" id="btnAiSettings" type="button">AI 设置</button>
       <button class="btn ghost" id="btnExport" type="button">导出数据</button>
       <button class="btn ghost" id="btnImport" type="button">导入数据</button>
@@ -36,9 +38,9 @@
       <div class="card">
         <h2 class="card-title">PDF 上传录入</h2>
         <div id="dropZone" class="drop-zone">
-          <p class="drop-text">将 PDF 文件拖拽到此处</p>
-          <p class="drop-sub">或 <span class="link">点击选择文件</span></p>
-          <input type="file" id="pdfFile" accept="application/pdf" hidden>
+          <p class="drop-text">将 PDF / Word / 图片拖拽到此处</p>
+          <p class="drop-sub">或 <span class="link">点击选择文件</span>（.pdf .docx .png .jpg .jpeg .webp）</p>
+          <input type="file" id="pdfFile" accept=".pdf,.docx,.png,.jpg,.jpeg,.webp,application/pdf" hidden>
         </div>
         <p id="pdfStatus" class="status"></p>
 

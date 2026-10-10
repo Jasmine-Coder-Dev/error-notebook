@@ -325,6 +325,71 @@ async fn ai_split_check(State(st): State<AppState>, body: Json<Map<String, Value
     Ok(Json(run_task(&st, "split-check", body.0).await?))
 }
 
+// ---------------- 文档解析（docx） ----------------
+
+/// POST /api/parse/docx（multipart：file 字段）→ {"text": "..."}
+async fn parse_docx(
+    mut multipart: axum::extract::Multipart,
+) -> Result<Json<Value>, ApiError> {
+    let mut bytes: Option<Vec<u8>> = None;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError::bad_request(&format!("上传解析失败：{e}")))?
+    {
+        if field.name() == Some("file") {
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| ApiError::bad_request(&format!("读取文件失败：{e}")))?;
+            bytes = Some(data.to_vec());
+            break;
+        }
+    }
+    let bytes = bytes.ok_or_else(|| ApiError::bad_request("缺少 file 字段"))?;
+    if bytes.len() > 20 * 1024 * 1024 {
+        return Err(ApiError::bad_request("文件超过 20MB 限制"));
+    }
+    // docx 魔数：PK\x03\x04
+    if !bytes.starts_with(b"PK\x03\x04") {
+        return Err(ApiError::bad_request("仅支持 .docx（Word 2007+）；.doc 老格式请先另存为 .docx"));
+    }
+    let text = crate::parse_docx::extract_text(&bytes)
+        .map_err(|e| ApiError::new(StatusCode::UNPROCESSABLE_ENTITY, "parse_error", e))?;
+    Ok(Json(json!({ "text": text })))
+}
+
+// ---------------- AI：图片文字识别 ----------------
+
+/// POST /api/ai/ocr（JSON：image 为 dataURL）→ {"text": "..."}
+async fn ai_ocr(body: Json<Map<String, Value>>) -> Result<Json<Value>, ApiError> {
+    let image = body
+        .0
+        .get("image")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    if !image.starts_with("data:image/") || !image.contains(";base64,") {
+        return Err(ApiError::bad_request("image 必须是 data:image/...;base64,... 格式"));
+    }
+    let conf = providers::resolved();
+    if conf.provider == "mock" {
+        return Ok(Json(json!({ "text": crate::prompts::MOCK_OCR_TEXT })));
+    }
+    if conf.api_key.is_empty() {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "config_error",
+            "尚未配置 API Key，请在「AI 设置」中配置，或选择 Mock 厂商".into(),
+        ));
+    }
+    let prompt = crate::prompts::OCR_PROMPT;
+    let content = ai::vision_chat(&conf.base_url, &conf.api_key, &conf.model, prompt, &image, 4000)
+        .await
+        .map_err(|e| ApiError::new(StatusCode::BAD_GATEWAY, e.kind, e.message))?;
+    Ok(Json(json!({ "text": content })))
+}
+
 // ---------------- 健康检查 ----------------
 
 async fn healthz() -> Json<Value> {
@@ -349,6 +414,8 @@ pub fn router(catalog: Vec<Value>) -> Router {
         .route("/api/ai/solve", post(ai_solve))
         .route("/api/ai/similar", post(ai_similar))
         .route("/api/ai/split-check", post(ai_split_check))
+        .route("/api/parse/docx", post(parse_docx))
+        .route("/api/ai/ocr", post(ai_ocr))
         .fallback(crate::server::static_handler)
         .with_state(state)
 }

@@ -15,6 +15,17 @@ impl std::fmt::Display for OutputError {
 
 pub const SYSTEM_JSON: &str = "你是一名严谨的中小学教研助手。所有回答必须且只能是 JSON，不要输出任何 JSON 以外的文字、解释或 Markdown 代码块标记。";
 
+/// 图片文字识别（OCR）任务的 prompt 与 Mock 样例文本（v0.0.3 新增，无 Python 版对应）。
+pub const OCR_PROMPT: &str = "你是精确的文字识别引擎。请把图片中的题目文字逐字提取为纯文本输出：
+1. 保持原有题号（如 1. / 2、/ (1)）与换行结构
+2. 数学公式用文本近似表示（如 3/4 × 8/9、x²）
+3. 不要添加任何解释、总结或 Markdown 标记，只输出图片中的文字内容
+4. 手写内容尽量辨认；无法辨认的字符用 ▢ 占位";
+
+pub const MOCK_OCR_TEXT: &str = "1. 计算下列各题：(1) 3/4 × 8/9 = （2） 12.5 - 7.8 =
+2. 一辆汽车每小时行驶 60 千米，行驶 2.5 小时共行驶多少千米？
+3. 已知长方形的长是 8 厘米，宽是 5 厘米，求它的周长和面积。";
+
 // 与 server/prompts.py 模板逐字一致（Python {{ }} 转义已展开为字面 { }）
 const PROMPT_TAG: &str = "请为下面这道{grade}{term}学期{subject}题标注知识点。
 

@@ -44,6 +44,26 @@
     el.className = 'status' + (type ? ' ' + type : '');
   }
 
+  /* ---------- 主题（自动 / 浅色 / 深色） ---------- */
+  const THEME_KEY = 'cuotiji_theme';
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  function applyTheme() {
+    const mode = localStorage.getItem(THEME_KEY) || 'auto';
+    const dark = mode === 'dark' || (mode === 'auto' && mq.matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    const label = { auto: '🌗 外观·自动', light: '☀️ 外观·浅色', dark: '🌙 外观·深色' }[mode];
+    const btn = $('#btnTheme');
+    if (btn) btn.textContent = label;
+  }
+  $('#btnTheme').addEventListener('click', () => {
+    const order = ['auto', 'light', 'dark'];
+    const cur = localStorage.getItem(THEME_KEY) || 'auto';
+    localStorage.setItem(THEME_KEY, order[(order.indexOf(cur) + 1) % order.length]);
+    applyTheme();
+  });
+  mq.addEventListener('change', applyTheme);
+  applyTheme();
+
   /* ================= AI 通用封装 ================= */
   let aiLoading = 0;
 
@@ -281,22 +301,68 @@
 
   async function handlePdf(file) {
     const status = $('#pdfStatus');
-    if (!/\.pdf$/i.test(file.name)) {
-      setStatus(status, '请选择 PDF 文件', 'err');
-      return;
-    }
-    setStatus(status, '正在解析 PDF，请稍候……');
+    const name = file.name.toLowerCase();
+    setStatus(status, '正在解析文件，请稍候……');
     pdfItems = [];
     renderPreview();
     try {
-      const text = await CJT.pdf.extractText(file);
-      if (!text) {
-        setStatus(status, '该 PDF 为扫描件，demo 版本仅支持文本型 PDF', 'err');
+      let text = '';
+      if (/\.pdf$/.test(name)) {
+        text = await CJT.pdf.extractText(file);
+        if (!text) {
+          setStatus(status, '该 PDF 为扫描件，暂不支持文本型以外的 PDF（可截图后按图片上传）', 'err');
+          return;
+        }
+      } else if (/\.docx$/.test(name)) {
+        if (file.size > 20 * 1024 * 1024) {
+          setStatus(status, 'Word 文件请控制在 20MB 以内', 'err');
+          return;
+        }
+        const fd = new FormData();
+        fd.append('file', file);
+        const resp = await fetch('/api/parse/docx', { method: 'POST', body: fd });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        text = data.text || '';
+        if (!text) {
+          setStatus(status, '未能从该 Word 文档提取到文字（可能为空文档或老版 .doc，请另存为 .docx）', 'err');
+          return;
+        }
+      } else if (/\.(png|jpe?g|webp)$/.test(name)) {
+        if (file.size > 10 * 1024 * 1024) {
+          setStatus(status, '图片请控制在 10MB 以内', 'err');
+          return;
+        }
+        setStatus(status, 'AI 识别图片文字中，请稍候……');
+        const dataUrl = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+        const resp = await fetch('/api/ai/ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: dataUrl })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          const msg = (data.detail && data.detail.message) || ('HTTP ' + resp.status);
+          setStatus(status, '图片识别失败：' + msg + '（需在「AI 设置」选择支持视觉的模型）', 'err');
+          return;
+        }
+        text = data.text || '';
+        if (!text) {
+          setStatus(status, 'AI 未识别出文字，请换一张更清晰的图片', 'err');
+          return;
+        }
+      } else {
+        setStatus(status, '支持的格式：PDF、Word(.docx)、图片(png/jpg/webp)', 'err');
         return;
       }
       const parts = CJT.pdf.splitQuestions(text);
       if (!parts.length) {
-        setStatus(status, '未能按题号识别出题目，请检查 PDF 是否为带题号的练习卷', 'err');
+        setStatus(status, '未能按题号识别出题目，请检查文档是否为带题号的练习卷', 'err');
         return;
       }
       pdfFileName = file.name;
