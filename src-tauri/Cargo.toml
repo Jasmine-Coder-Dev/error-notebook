@@ -1,6 +1,6 @@
 [package]
 name = "error-notebook"
-version = "0.0.2"
+version = "0.0.3"
 description = "学生错题集（Tauri 壳 + 内嵌 Rust/axum 后端）"
 edition = "2021"
 rust-version = "1.77.2"

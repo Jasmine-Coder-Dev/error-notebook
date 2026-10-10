@@ -111,9 +111,10 @@ Open **AI Settings** in the app → pick a provider → paste your API key → *
 
 - [x] v0.0.1 — PDF splitting, filtering, paper generation & printing, weak-point analytics, five AI abilities
 - [x] v0.0.2 — Rust backend (70% smaller, millisecond startup), Word/image upload, light/dark themes
-- [x] Phase 1 — stage-based classification (college / professional exams), question-type charts, mastery weighting, sidebar UI, onboarding
-- [x] Phase 2 — question images, weakness-first paper generation, error trends
-- [x] Phase 3 — spaced repetition, mock exams
+- [x] v0.0.3 — full audience-expansion release (Phases 1–3):
+  - Phase 1: stage-based classification (college / professional exams), question-type charts, mastery weighting, sidebar UI, onboarding
+  - Phase 2: question images, weakness-first paper generation, error trends
+  - Phase 3: spaced repetition, mock exams
 - [ ] Next — system-level window materials (Liquid Glass / Mica), knowledge graph, SM-2 adaptive intervals
 
 Full design (in Chinese): [docs/受众扩展方案.md](docs/受众扩展方案.md).
