@@ -1,5 +1,7 @@
-"""OpenAI 兼容客户端封装。区分：网络错误 / 鉴权失败 / 其他 API 错误。"""
-from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI, OpenAIError
+"""OpenAI 兼容客户端封装。区分：网络错误 / 鉴权失败 / 其他 API 错误。
+
+openai SDK 延迟到首次调用时才导入，避免拖慢应用启动。
+"""
 
 
 class AIError(Exception):
@@ -15,6 +17,9 @@ async def chat(base_url: str, api_key: str, model: str, messages: list,
                temperature: float = 0.2, max_tokens: int = 2000, timeout: float = 60.0) -> str:
     if not base_url:
         raise AIError("config_error", "未配置 base_url")
+    # 延迟导入：openai SDK 及其依赖只在真正调用 AI 时加载
+    from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI, OpenAIError
+
     client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
     try:
         resp = await client.chat.completions.create(

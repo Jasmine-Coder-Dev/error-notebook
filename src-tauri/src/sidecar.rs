@@ -101,7 +101,7 @@ pub fn start(app: &AppHandle) {
                 show_error_page(&app);
                 return;
             }
-            std::thread::sleep(Duration::from_secs(5));
+            std::thread::sleep(Duration::from_millis(200));
         }
         if let Some(window) = app.get_webview_window("main") {
             let url: Url = format!("http://127.0.0.1:{port}/")
