@@ -16,40 +16,11 @@ pub struct Provider {
 }
 
 pub const PROVIDERS: &[Provider] = &[
-    Provider {
-        id: "glm",
-        name: "GLM 智谱",
-        base_url: "https://open.bigmodel.cn/api/paas/v4",
-        // 2026-10 世代：GLM-5 系列（以 bigmodel.cn 模型列表为准；免费档通常为 flash 系）
-        models: &["glm-5.3", "glm-5.2", "glm-5-flash"],
-    },
-    Provider {
-        id: "deepseek",
-        name: "DeepSeek",
-        base_url: "https://api.deepseek.com/v1",
-        // 官方文档核实：deepseek-flash(V4.1) 支持视觉且极低价；v4-pro 纯文本旗舰
-        models: &["deepseek-flash", "deepseek-v4-pro"],
-    },
-    Provider {
-        id: "kimi",
-        name: "Kimi 月之暗面",
-        base_url: "https://api.moonshot.cn/v1",
-        // K3 系列为当前主力，支持图像理解
-        models: &["kimi-k3", "kimi-k2.6"],
-    },
-    Provider {
-        id: "minimax",
-        name: "MiniMax",
-        base_url: "https://api.minimaxi.com/v1",
-        models: &["MiniMax-M3"],
-    },
-    Provider {
-        id: "qwen",
-        name: "Qwen 阿里",
-        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        // 官方文档核实：flash=低价文本；omni-flash=全模态（视觉）；plus/max 亦支持图像理解
-        models: &["qwen3.8-flash", "qwen3.8-omni-flash", "qwen3.7-plus", "qwen3.8-max"],
-    },
+    Provider { id: "glm", name: "GLM 智谱", base_url: "https://open.bigmodel.cn/api/paas/v4", models: &["glm-4-flash", "glm-4-air"] },
+    Provider { id: "deepseek", name: "DeepSeek", base_url: "https://api.deepseek.com/v1", models: &["deepseek-chat"] },
+    Provider { id: "kimi", name: "Kimi 月之暗面", base_url: "https://api.moonshot.cn/v1", models: &["moonshot-v1-8k", "kimi-k2-0905-preview"] },
+    Provider { id: "minimax", name: "MiniMax", base_url: "https://api.minimaxi.com/v1", models: &["MiniMax-M1", "abab6.5s-chat"] },
+    Provider { id: "qwen", name: "Qwen 阿里", base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1", models: &["qwen-turbo", "qwen-plus"] },
     Provider { id: "custom", name: "自定义（OpenAI 兼容接口）", base_url: "", models: &[] },
     Provider { id: "mock", name: "Mock（离线联调，无需 Key）", base_url: "", models: &["mock-model"] },
 ];
