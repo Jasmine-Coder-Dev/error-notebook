@@ -1,8 +1,98 @@
 {
   "images": [
-    {"filename":"icon-light-1024.png","idiom":"mac","scale":"1x","size":"1024x1024","appearances":[{"appearance":"luminosity","value":"light"}]},
-    {"filename":"icon-dark-1024.png","idiom":"mac","scale":"1x","size":"1024x1024","appearances":[{"appearance":"luminosity","value":"dark"}]},
-    {"filename":"icon-light-1024.png","idiom":"mac","scale":"1x","size":"1024x1024"}
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "1x",
+      "size": "512x512"
+    },
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "2x",
+      "size": "512x512"
+    },
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "1x",
+      "size": "256x256"
+    },
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "2x",
+      "size": "256x256"
+    },
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "1x",
+      "size": "128x128"
+    },
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "2x",
+      "size": "128x128"
+    },
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "1x",
+      "size": "32x32"
+    },
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "2x",
+      "size": "32x32"
+    },
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "1x",
+      "size": "16x16"
+    },
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "2x",
+      "size": "16x16"
+    },
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "1x",
+      "size": "1024x1024",
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "light"
+        }
+      ]
+    },
+    {
+      "filename": "icon-dark-1024.png",
+      "idiom": "mac",
+      "scale": "1x",
+      "size": "1024x1024",
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ]
+    },
+    {
+      "filename": "icon-light-1024.png",
+      "idiom": "mac",
+      "scale": "1x",
+      "size": "1024x1024"
+    }
   ],
-  "info":{"author":"xcode","version":1}
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
 }

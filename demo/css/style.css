@@ -5,46 +5,80 @@
 
 /* ========== 主题变量（浅色默认，深色 [data-theme="dark"]，玻璃材质随主题换基底） ========== */
 :root {
-  --bg: #f4f6fa;
+  --bg: #f5f7fb;
   --card: #ffffff;
-  --text: #1f2937;
+  --text: #1a2332;
+  --text-secondary: #374151;
   --muted: #6b7280;
   --border: #e2e8f0;
+  --border-light: #f0f4f8;
   --primary: #2563eb;
   --primary-dark: #1e40af;
+  --primary-bg: #eff6ff;
   --danger: #dc2626;
   --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
   --warn: #b45309;
   --warn-bg: #fffbeb;
   --ok: #047857;
   --ok-bg: #ecfdf5;
   --radius: 12px;
-  --shadow: 0 1px 3px rgba(15, 23, 42, 0.07), 0 4px 14px rgba(15, 23, 42, 0.05);
-  --shadow-hover: 0 4px 8px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(15, 23, 42, 0.08);
-  --glass-bg: rgba(250, 250, 252, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.5);
+  --shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 14px rgba(15, 23, 42, 0.04);
+  --shadow-hover: 0 4px 8px rgba(15, 23, 42, 0.07), 0 8px 24px rgba(15, 23, 42, 0.07);
+  --glass-bg: rgba(248, 250, 254, 0.82);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --surface-2: #f1f5f9;
+  --surface-3: #e8ecf2;
+  --chip: #eef2ff;
   --chart-red: #ef4444;
   --chart-yellow: #f59e0b;
   --chart-green: #10b981;
+  --toast-bg: #1e293b;
+  --toast-text: #f1f5f9;
+  --preview-bg: #fafbfd;
+  --drop-border: #c4cdd8;
+  --drop-hover: #eff6ff;
+  --focus-ring: #93c5fd;
+  --spin-track: #dbeafe;
+  --overlay: rgba(255,255,255,0.6);
+  --btn-hover-border: #c4cdd8;
+  --input-bg: #fff;
 }
 [data-theme="dark"] {
-  --bg: #161b26;
-  --card: #1e2532;
-  --text: #e5e9f0;
-  --muted: #94a3b8;
-  --border: #2e3a4e;
-  --primary: #3b82f6;
-  --primary-dark: #60a5fa;
+  --bg: #0e1219;
+  --card: #171e2a;
+  --text: #dce3ee;
+  --text-secondary: #b8c2d4;
+  --muted: #7a8a9e;
+  --border: #263043;
+  --border-light: #1e2636;
+  --primary: #4f8ef7;
+  --primary-dark: #6ba3fa;
+  --primary-bg: #16233a;
   --danger: #f87171;
-  --danger-bg: #3a2020;
+  --danger-bg: #2a1a1a;
+  --danger-border: #4a2a2a;
   --warn: #fbbf24;
-  --warn-bg: #3a2f14;
+  --warn-bg: #2a2210;
   --ok: #34d399;
-  --ok-bg: #12332a;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
-  --shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.3);
-  --glass-bg: rgba(22, 27, 38, 0.68);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --ok-bg: #0f2e22;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 4px 14px rgba(0, 0, 0, 0.18);
+  --shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+  --glass-bg: rgba(16, 21, 30, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --surface-2: #1e2636;
+  --surface-3: #232e42;
+  --chip: #1a2c48;
+  --toast-bg: #e2e8f0;
+  --toast-text: #1a2332;
+  --preview-bg: #1a2233;
+  --drop-border: #3a4a62;
+  --drop-hover: #16223a;
+  --focus-ring: #2563eb;
+  --spin-track: #233250;
+  --overlay: rgba(0,0,0,0.55);
+  --btn-hover-border: #3a4a62;
+  --input-bg: #171e2a;
 }
 
 * { box-sizing: border-box; }
@@ -332,8 +366,7 @@ input:focus, textarea:focus, select:focus { outline: 2px solid color-mix(in srgb
 
 /* ========== 组卷预览 ========== */
 .paper-sheet {
-  background: #fff;
-  color: #111;
+  background: var(--card);  color: #111;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -433,7 +466,7 @@ input:focus, textarea:focus, select:focus { outline: 2px solid color-mix(in srgb
 .toast {
   position: fixed; bottom: 28px; left: 50%;
   transform: translateX(-50%);
-  background: #111827; color: #fff;
+  background: var(--toast-bg); color: var(--toast-text);
   padding: 10px 22px; border-radius: 999px;
   font-size: 14px; z-index: 100;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
@@ -475,7 +508,7 @@ input:focus, textarea:focus, select:focus { outline: 2px solid color-mix(in srgb
 /* ========== AI 加载态 ========== */
 .loading-overlay {
   position: fixed; inset: 0;
-  background: rgba(255, 255, 255, 0.65);
+  background: var(--overlay);
   display: flex; flex-direction: column; gap: 12px;
   align-items: center; justify-content: center;
   z-index: 95; font-size: 14px; color: var(--muted);
