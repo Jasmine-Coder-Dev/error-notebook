@@ -82,18 +82,29 @@
 
 ## 🤖 AI 配置（可选）
 
-打开应用右上角「AI 设置」→ 选择厂商 → 填入 API Key → 测试连接：
+打开应用右上角「AI 设置」→ 选择厂商 → 填入 API Key → 测试连接。**按用途选模型**（2026-10 依据各厂商官方文档核实；模型迭代快，以各家模型列表页为准）：
 
-| 厂商 | 推荐模型 | 备注 |
+### 日常任务（打标 / 解析 / 同类题 / 切分）——选便宜文本模型
+
+| 厂商 | 推荐模型 | 说明 |
 | --- | --- | --- |
-| GLM 智谱 | `glm-4-flash` | 有免费额度 |
-| DeepSeek | `deepseek-chat` | |
-| Kimi 月之暗面 | `moonshot-v1-8k` | |
-| MiniMax | `MiniMax-M1` | |
-| Qwen 阿里 | `qwen-turbo` | |
-| **Mock** | - | 无需 Key，离线体验全部 AI 流程 |
+| DeepSeek | `deepseek-flash` | V4.1 世代；缓存命中低至 $0.003/百万 token，**且原生支持视觉**（官方文档核实） |
+| Qwen 阿里 | `qwen3.8-flash` | 低价档主力文本模型 |
+| GLM 智谱 | `glm-5.3` / `glm-5-flash` | GLM-5 世代；免费档通常为 flash 系（以 bigmodel.cn 列表为准） |
+| Kimi 月之暗面 | `kimi-k3` | K3 系列，当前主力 |
+| MiniMax | `MiniMax-M3` | 当前主力 |
 
-图片识别需选择**视觉模型**（如 GLM-4V / Qwen-VL）。不配置 AI 不影响其他功能。
+### 图片识别（拍照/截图上传）——必须选多模态模型
+
+| 厂商 | 推荐模型 | 说明 |
+| --- | --- | --- |
+| DeepSeek | `deepseek-flash` | 官方定价页标注 Vision ✓，选它即可两用 |
+| Qwen 阿里 | `qwen3.8-omni-flash` | 全模态档；`qwen3.7-plus`/`qwen3.8-max` 也支持图像理解 |
+| Kimi | `kimi-k3` | 支持图像理解 |
+| GLM | GLM-5 视觉版 | 以 bigmodel.cn 模型列表中标注「图像理解」的型号为准 |
+| MiniMax | — | 图片识别建议换用其他厂商 |
+
+选 **Mock** 无需 Key，离线体验全部 AI 流程。不配置 AI 不影响其他功能；模型字段为自由输入，厂商上新模型后直接填新 ID ��可用。
 
 ## 🗺 Roadmap
 

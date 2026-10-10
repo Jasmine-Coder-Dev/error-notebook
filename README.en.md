@@ -82,18 +82,29 @@ Grab the latest build from [Releases](https://github.com/SteveSunYifan/error-not
 
 ## 🤖 AI Setup (optional)
 
-Open **AI Settings** in the app → pick a provider → paste your API key → **Test connection**:
+Open **AI Settings** in the app → pick a provider → paste your API key → **Test connection**. **Pick a model per use case** (verified against provider docs, Oct 2026; check each platform's model list as models iterate fast):
+
+### Everyday tasks (tagging / explanations / similar questions / split-check) — cheap text models
 
 | Provider | Recommended model | Notes |
 | --- | --- | --- |
-| Zhipu GLM | `glm-4-flash` | Free tier available |
-| DeepSeek | `deepseek-chat` | |
-| Moonshot Kimi | `moonshot-v1-8k` | |
-| MiniMax | `MiniMax-M1` | |
-| Alibaba Qwen | `qwen-turbo` | |
-| **Mock** | — | No key needed; try every AI flow offline |
+| DeepSeek | `deepseek-flash` | V4.1 generation; as low as $0.003/1M cached input, **natively supports vision** (per official docs) |
+| Alibaba Qwen | `qwen3.8-flash` | Low-cost workhorse |
+| Zhipu GLM | `glm-5.3` / `glm-5-flash` | GLM-5 generation; free tier is usually the flash variant |
+| Moonshot Kimi | `kimi-k3` | Current flagship series |
+| MiniMax | `MiniMax-M3` | Current flagship |
 
-Image recognition requires a **vision model** (e.g. GLM-4V / Qwen-VL). All other features work without any AI configuration.
+### Image recognition (photo/screenshot upload) — a multimodal model is required
+
+| Provider | Recommended model | Notes |
+| --- | --- | --- |
+| DeepSeek | `deepseek-flash` | Vision ✓ per official pricing page — one model for everything |
+| Alibaba Qwen | `qwen3.8-omni-flash` | Omni tier; `qwen3.7-plus` / `qwen3.8-max` also accept images |
+| Moonshot Kimi | `kimi-k3` | Image understanding supported |
+| Zhipu GLM | GLM-5 vision variant | Pick a model marked "image understanding" on bigmodel.cn |
+| MiniMax | — | Prefer another provider for images |
+
+**Mock** works offline with no key. All non-AI features work without configuration; the model field is free text — new model IDs work as soon as providers release them.
 
 ## 🗺 Roadmap
 
