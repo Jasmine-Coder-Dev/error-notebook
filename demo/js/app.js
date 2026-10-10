@@ -1278,8 +1278,6 @@
   });
 
   /* ================= 今日复习（间隔重复 1/3/7/15 天） ================= */
-  const REVIEW_STEPS = [1, 3, 7, 15];
-
   function todayStr() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -1312,32 +1310,54 @@
           `<img src="/images/${esc(n)}" class="img-thumb" alt="">`).join('')}</div>` : ''}
         <details class="review-answer"><summary>看答案</summary><div class="q-answer">${esc(q.answer || '（暂无答案）')}</div></details>
         <div class="q-foot">
-          <span class="hint">先自己动笔做，再对答案</span>
+          <span class="hint">先自己动笔做，再对答案，然后按真实感受点一个</span>
           <span class="spacer"></span>
-          <button type="button" class="btn small rev-again">再练一遍</button>
-          <button type="button" class="btn small rev-known" style="color:var(--ok);border-color:var(--ok)">已掌握</button>
+          <button type="button" class="btn danger small rev-grade" data-rating="forgot">😵 忘了 · 明天</button>
+          <button type="button" class="btn small rev-grade" data-rating="good">🙂 想起来了 · ${sm2Preview(q, 'good')}</button>
+          <button type="button" class="btn small rev-grade" data-rating="easy">😎 很轻松 · ${sm2Preview(q, 'easy')}</button>
+          <button type="button" class="btn small rev-known" style="color:var(--ok);border-color:var(--ok)">✓ 已掌握，不用再复习</button>
         </div>
       </div>
     `).join('');
   }
 
+  // SM-2 间隔预览（与后端 sm2_next 同公式，仅用于按钮文案）
+  function sm2Preview(q, rating) {
+    const reps = q.reps || 0;
+    const ease = Math.min(2.8, Math.max(1.3, q.ease || 2.5));
+    const cur = Math.max(1, q.reviewInterval || 0);
+    if (rating === 'forgot') return '明天';
+    const r = reps + 1;
+    let base = r === 1 ? 1 : r === 2 ? 6 : Math.round(cur * ease);
+    if (rating === 'easy') base = Math.round(base * 1.3);
+    const days = Math.min(180, Math.max(1, base));
+    return days + ' 天后';
+  }
+
   $('#reviewList').addEventListener('click', async e => {
-    const again = e.target.closest('.rev-again');
+    const grade = e.target.closest('.rev-grade');
     const known = e.target.closest('.rev-known');
-    if (!again && !known) return;
-    const id = (again || known).closest('.q-card').dataset.id;
+    if (!grade && !known) return;
+    const id = (grade || known).closest('.q-card').dataset.id;
     const q = store.get(id);
     if (!q) return;
     if (known) {
       await store.update(id, { mastery: '已掌握' });
       toast('很好，这题不再安排复习');
     } else {
-      const step = REVIEW_STEPS[Math.min((q.reviewInterval || 0) + 1, REVIEW_STEPS.length - 1)];
-      const d = new Date();
-      d.setDate(d.getDate() + step);
-      const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      await store.update(id, { mastery: '复习中', reviewInterval: (q.reviewInterval || 0) + 1, nextReviewAt: next });
-      toast(`${step} 天后再见`);
+      const rating = grade.dataset.rating;
+      const resp = await fetch('/api/review/' + encodeURIComponent(id), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating })
+      });
+      if (!resp.ok) {
+        const info = await resp.json().catch(() => ({}));
+        toast((info.detail && info.detail.message) || '操作没成功，再试一次');
+        return;
+      }
+      const updated = await resp.json();
+      toast(rating === 'forgot' ? '没关系，明天再来一遍' : `记住了，${updated.reviewInterval} 天后再见`);
     }
     await refreshAll();
   });

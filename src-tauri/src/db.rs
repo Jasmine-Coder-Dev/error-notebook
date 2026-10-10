@@ -62,12 +62,24 @@ CREATE TABLE IF NOT EXISTS questions (
     qtype           TEXT NOT NULL DEFAULT '',
     images          TEXT NOT NULL DEFAULT '[]',
     next_review_at  TEXT NOT NULL DEFAULT '',
-    review_interval INTEGER NOT NULL DEFAULT 0
+    review_interval INTEGER NOT NULL DEFAULT 0,
+    ease            REAL NOT NULL DEFAULT 2.5,
+    reps            INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS review_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id  TEXT NOT NULL,
+    reviewed_at  TEXT NOT NULL,
+    rating       TEXT NOT NULL,
+    interval_before INTEGER NOT NULL DEFAULT 0,
+    interval_after  INTEGER NOT NULL DEFAULT 0,
+    ease_after   REAL NOT NULL DEFAULT 2.5
 );
 ";
 
 /// 列名列表（SELECT 显式列出，避免新增列后索引错位）。
-const COLUMNS: &str = "id, text, answer, grade, term, subject, knowledge_points, is_wrong, wrong_reason, mastery, source_file, created_at, stage, qtype, images, next_review_at, review_interval";
+const COLUMNS: &str = "id, text, answer, grade, term, subject, knowledge_points, is_wrong, wrong_reason, mastery, source_file, created_at, stage, qtype, images, next_review_at, review_interval, ease, reps";
 
 /// 数据目录：~/.cuotiji（与 Python 版一致）。
 pub fn data_dir() -> PathBuf {
@@ -120,6 +132,15 @@ fn migrate(c: &Connection) -> Result<(), String> {
     }
     if !cols.iter().any(|c| c == "review_interval") {
         c.execute("ALTER TABLE questions ADD COLUMN review_interval INTEGER NOT NULL DEFAULT 0", [])
+            .map_err(|e| e.to_string())?;
+    }
+    // SM-2：ease 因子与复习次数（幂等）
+    if !cols.iter().any(|c| c == "ease") {
+        c.execute("ALTER TABLE questions ADD COLUMN ease REAL NOT NULL DEFAULT 2.5", [])
+            .map_err(|e| e.to_string())?;
+    }
+    if !cols.iter().any(|c| c == "reps") {
+        c.execute("ALTER TABLE questions ADD COLUMN reps INTEGER NOT NULL DEFAULT 0", [])
             .map_err(|e| e.to_string())?;
     }
     // 回填：空 stage 按 grade 推断
@@ -248,6 +269,10 @@ pub fn normalize(data: &Map<String, Value>) -> Map<String, Value> {
     m.insert("images".into(), json!(images));
     m.insert("nextReviewAt".into(), json!(next_review_at));
     m.insert("reviewInterval".into(), json!(review_interval));
+    let ease = data.get("ease").and_then(|v| v.as_f64()).unwrap_or(2.5).clamp(1.3, 2.8);
+    let reps = data.get("reps").and_then(|v| v.as_i64()).unwrap_or(0).max(0);
+    m.insert("ease".into(), json!(ease));
+    m.insert("reps".into(), json!(reps));
     m
 }
 
@@ -310,6 +335,8 @@ pub fn row_to_q(row: &rusqlite::Row) -> rusqlite::Result<Map<String, Value>> {
     m.insert("images".into(), json!(images));
     m.insert("nextReviewAt".into(), json!(get("next_review_at")?));
     m.insert("reviewInterval".into(), json!(row.get::<&str, i64>("review_interval")?));
+    m.insert("ease".into(), json!(row.get::<&str, f64>("ease")?));
+    m.insert("reps".into(), json!(row.get::<&str, i64>("reps")?));
     Ok(m)
 }
 
@@ -361,8 +388,8 @@ fn insert(c: &Connection, q: &Map<String, Value>) -> Result<(), String> {
     c.execute(
         "INSERT OR REPLACE INTO questions (id, text, answer, grade, term, subject, \
          knowledge_points, is_wrong, wrong_reason, mastery, source_file, created_at, stage, qtype, \
-         images, next_review_at, review_interval) \
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+         images, next_review_at, review_interval, ease, reps) \
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         params![
             q["id"].as_str().unwrap_or(""),
             q["text"].as_str().unwrap_or(""),
@@ -381,6 +408,8 @@ fn insert(c: &Connection, q: &Map<String, Value>) -> Result<(), String> {
             serde_json::to_string(&q["images"]).unwrap_or_else(|_| "[]".into()),
             q["nextReviewAt"].as_str().unwrap_or(""),
             q["reviewInterval"].as_i64().unwrap_or(0),
+            q["ease"].as_f64().unwrap_or(2.5),
+            q["reps"].as_i64().unwrap_or(0),
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -521,4 +550,88 @@ mod tests {
         assert!(qtype_vocab("大学").contains(&"计算证明"));
         assert!(qtype_vocab("高中").contains(&"实验探究"));
     }
+
+    #[test]
+    fn sm2_progression() {
+        // 忘了：重置 1 天，ease 2.5 → 2.5 + 0.1 - 3*(0.08+0.06) ≈ 2.18
+        let (i, e, r) = sm2_next(30, 2.5, 5, "forgot");
+        assert_eq!((i, r), (1, 0));
+        assert!((e - 2.18).abs() < 1e-9);
+        // 第一次想起来：1 天，ease 不变（q=4 时调整量恰为 0）
+        let (i, e, r) = sm2_next(0, 2.5, 0, "good");
+        assert_eq!((i, r), (1, 1));
+        assert!((e - 2.5).abs() < 1e-9);
+        // 第二次：6 天
+        let (i, _, r) = sm2_next(1, 2.5, 1, "good");
+        assert_eq!((i, r), (6, 2));
+        // 之后按 interval×ease 增长（先四舍五入）；easy 再 ×1.3
+        // ease 2.5 → 2.6；base = round(6×2.6) = 16；easy = round(16×1.3) = 21
+        let (i_easy, _, _) = sm2_next(6, 2.5, 2, "easy");
+        assert_eq!(i_easy, 21);
+    }
+}
+
+// ===================== SM-2 自适应间隔（方案 §8.1） =====================
+
+pub const SM2_MAX_INTERVAL: i64 = 180;
+
+/// SM-2 核心计算：给定当前状态与评分，返回 (新间隔, 新 ease, 新 reps)。
+/// rating: "forgot"(q=2) / "good"(q=4) / "easy"(q=5)
+pub fn sm2_next(cur_interval: i64, mut ease: f64, reps: i64, rating: &str) -> (i64, f64, i64) {
+    let q: i64 = match rating {
+        "forgot" => 2,
+        "easy" => 5,
+        _ => 4,
+    };
+    let dq = 5 - q;
+    ease += 0.1 - (dq as f64) * (0.08 + (dq as f64) * 0.02);
+    ease = ease.clamp(1.3, 2.8);
+
+    let (interval, reps) = if q < 3 {
+        (1, 0)
+    } else {
+        let reps = reps + 1;
+        let base = match reps {
+            1 => 1,
+            2 => 6,
+            _ => ((cur_interval.max(1) as f64) * ease).round() as i64,
+        };
+        let mut interval = base;
+        if q == 5 {
+            interval = (base as f64 * 1.3).round() as i64;
+        }
+        (interval.clamp(1, SM2_MAX_INTERVAL), reps)
+    };
+    (interval, ease, reps)
+}
+
+/// 应用一次复习评分：更新题目排期并写 review_log。
+pub fn apply_review(id: &str, rating: &str) -> Result<Option<Map<String, Value>>, String> {
+    let existing = get_question(id)?;
+    let q = match existing {
+        Some(q) => q,
+        None => return Ok(None),
+    };
+    let cur_interval = q["reviewInterval"].as_i64().unwrap_or(0);
+    let cur_ease = q["ease"].as_f64().unwrap_or(2.5);
+    let cur_reps = q["reps"].as_i64().unwrap_or(0);
+    let (interval, ease, reps) = sm2_next(cur_interval, cur_ease, cur_reps, rating);
+    let next_at = date_after_days(interval);
+
+    let mut updated = q.clone();
+    updated.insert("mastery".into(), json!("复习中"));
+    updated.insert("reviewInterval".into(), json!(interval));
+    updated.insert("ease".into(), json!(ease));
+    updated.insert("reps".into(), json!(reps));
+    updated.insert("nextReviewAt".into(), json!(next_at));
+    let c = conn()?;
+    insert(&c, &updated)?;
+
+    c.execute(
+        "INSERT INTO review_log (question_id, reviewed_at, rating, interval_before, interval_after, ease_after) \
+         VALUES (?,?,?,?,?,?)",
+        params![id, now_iso(), rating, cur_interval, interval, ease],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(Some(updated))
 }

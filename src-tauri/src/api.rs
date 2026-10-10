@@ -183,6 +183,23 @@ async fn import_all(body: Json<Value>) -> Result<Json<Value>, ApiError> {
     Ok(Json(json!({"imported": inserted.len()})))
 }
 
+// ---------------- SM-2 复习评分 ----------------
+
+/// POST /api/review/{id} {"rating":"forgot"|"good"|"easy"} → 更新后的题目
+async fn review_question(
+    Path(id): Path<String>,
+    body: Json<Map<String, Value>>,
+) -> Result<Json<Value>, ApiError> {
+    let rating = body.0.get("rating").and_then(|v| v.as_str()).unwrap_or("");
+    if !matches!(rating, "forgot" | "good" | "easy") {
+        return Err(ApiError::bad_request("rating 必须是 forgot / good / easy"));
+    }
+    match db::apply_review(&id, rating).map_err(db_err)? {
+        Some(q) => Ok(Json(Value::Object(q))),
+        None => Err(ApiError::not_found(format!("题目不存在：{id}"))),
+    }
+}
+
 // ---------------- 图片题干 ----------------
 
 /// 图片目录。
@@ -529,6 +546,7 @@ pub fn router(catalog: Vec<Value>) -> Router {
         .route("/api/ai/ocr", post(ai_ocr))
         .route("/api/upload/image", post(upload_image))
         .route("/images/{name}", get(serve_image))
+        .route("/api/review/{id}", post(review_question))
         .fallback(crate::server::static_handler)
         .with_state(state)
 }
