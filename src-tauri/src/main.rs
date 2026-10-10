@@ -1,16 +1,5 @@
-mod sidecar;
+//! 桌面入口：调用库 crate 的 run()（移动端由 JNI 直接调 error_notebook_lib::run）。
 
 fn main() {
-    tauri::Builder::default()
-        .setup(|app| {
-            sidecar::start(app.handle());
-            Ok(())
-        })
-        .build(tauri::generate_context!())
-        .expect("failed to build tauri application")
-        .run(|_app, event| {
-            if let tauri::RunEvent::Exit = event {
-                sidecar::kill();
-            }
-        });
+    error_notebook_lib::run();
 }

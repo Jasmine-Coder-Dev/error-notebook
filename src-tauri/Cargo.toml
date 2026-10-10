@@ -1,9 +1,13 @@
 [package]
 name = "error-notebook"
-version = "0.0.1"
-description = "学生错题集（Tauri 壳 + Python sidecar）"
+version = "0.0.2"
+description = "学生错题集（Tauri 壳 + 内嵌 Rust/axum 后端）"
 edition = "2021"
 rust-version = "1.77.2"
+
+[lib]
+name = "error_notebook_lib"
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -12,4 +16,12 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-libc = "0.2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+axum = "0.8"
+rusqlite = { version = "0.32", features = ["bundled"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+rust-embed = "8"
+dirs = "6"
+regex = "1"
+rand = "0.8"
+time = { version = "0.3", features = ["formatting", "local-offset", "macros"] }

@@ -16,31 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Python dependencies
-        run: pip install -r server/requirements.txt -r build-requirements.txt
-
-      - name: Build python-server sidecar (PyInstaller)
-        run: pyinstaller --clean -y cuotiji.spec
-
-      - name: Stage sidecar binary for Tauri
-        shell: bash
-        run: |
-          mkdir -p src-tauri/binaries
-          if [ "${{ runner.os }}" = "macOS" ]; then
-            cp dist/python-server "src-tauri/binaries/python-server-aarch64-apple-darwin"
-            chmod +x "src-tauri/binaries/python-server-aarch64-apple-darwin"
-          else
-            cp dist/python-server.exe "src-tauri/binaries/python-server-x86_64-pc-windows-msvc.exe"
-          fi
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install frontend deps (none) & Tauri CLI
+      - name: Install Tauri CLI
         run: cargo install tauri-cli --version '^2'
 
       - name: Tauri build

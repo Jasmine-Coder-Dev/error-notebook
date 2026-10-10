@@ -15,7 +15,7 @@ build/
 # Tauri
 src-tauri/target/
 src-tauri/binaries/
-src-tauri/gen/
+src-tauri/gen/schemas/
 
 # 系统/编辑器
 .DS_Store
