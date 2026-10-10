@@ -67,13 +67,16 @@ html[data-platform="linux"] body { background: var(--bg); }
 
 html[data-platform="macos"] .sidebar,
 html[data-platform="windows"] .sidebar {
-  background: transparent !important;  /* 露出系统材质 */
-  -webkit-backdrop-filter: none;       /* 系统级效果已含模糊，避免双重 */
+  background: var(--glass-bg);            /* 半透明底：保底可读性，系统材质穿透 */
+  -webkit-backdrop-filter: none;           /* 系统级效果已含模糊 */
   backdrop-filter: none;
+  border-right: 1px solid var(--glass-border);
 }
 html:not([data-platform]) .sidebar,
 html[data-platform="linux"] .sidebar {
   background: var(--glass-bg); /* 兜底：Web 层玻璃 */
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
 }
 
 /* ========== 布局：左侧导航 + 内容区 ========== */

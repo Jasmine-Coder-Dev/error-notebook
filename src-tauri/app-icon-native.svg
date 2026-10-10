@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- macOS 27 原生风格图标：实底 + 精致细节 + 前景符号，不透明 -->
+  <defs>
+    <linearGradient id="bgL" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2fb"/>
+      <stop offset="1" stop-color="#d8def0"/>
+    </linearGradient>
+    <linearGradient id="bgD" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#232939"/>
+      <stop offset="1" stop-color="#141826"/>
+    </linearGradient>
+    <linearGradient id="paperL" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f4f6fc"/>
+    </linearGradient>
+    <linearGradient id="paperD" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c344a"/>
+      <stop offset="1" stop-color="#252c40"/>
+    </linearGradient>
+    <linearGradient id="inkL" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b55b8"/>
+      <stop offset="1" stop-color="#1e3f95"/>
+    </linearGradient>
+    <linearGradient id="inkD" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6a94f0"/>
+      <stop offset="1" stop-color="#4d6fd0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- squircle 画布 -->
+  <rect width="1024" height="1024" rx="232" fill="BG_VAR"/>
+  <!-- 顶部微妙弧光 -->
+  <ellipse cx="512" cy="80" rx="480" ry="180" fill="#ffffff" opacity="BG_GLOW"/>
+
+  <!-- 笔记本（前景，实心质感） -->
+  <g>
+    <rect x="228" y="200" width="568" height="660" rx="56" fill="PAPER_VAR"/>
+    <!-- 书脊 -->
+    <rect x="228" y="200" width="38" height="660" rx="19" fill="INK_VAR" opacity="0.75"/>
+    <!-- 装订环 -->
+    <g fill="INK_VAR">
+      <circle cx="302" cy="330" r="18"/>
+      <circle cx="302" cy="530" r="18"/>
+      <circle cx="302" cy="730" r="18"/>
+    </g>
+    <!-- 内页文字线 -->
+    <g stroke="INK_VAR" stroke-width="14" stroke-linecap="round" opacity="0.3">
+      <line x1="362" y1="380" x2="696" y2="380"/>
+      <line x1="362" y1="448" x2="632" y2="448"/>
+    </g>
+    <!-- 错题红线 -->
+    <line x1="362" y1="560" x2="680" y2="560" stroke="#ef4444" stroke-width="16" stroke-linecap="round" opacity="0.8"/>
+  </g>
+
+  <!-- 红 ✗ -->
+  <g transform="translate(336,600)">
+    <circle r="112" fill="#ef4444"/>
+    <circle r="112" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="4"/>
+    <g stroke="#fff" stroke-width="28" stroke-linecap="round">
+      <line x1="-44" y1="-44" x2="44" y2="44"/>
+      <line x1="44" y1="-44" x2="-44" y2="44"/>
+    </g>
+  </g>
+  <!-- 绿 ✓ -->
+  <g transform="translate(702,752)">
+    <circle r="100" fill="#16a34a"/>
+    <circle r="100" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="4"/>
+    <path d="M -44 6 L -10 40 L 48 -30" fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

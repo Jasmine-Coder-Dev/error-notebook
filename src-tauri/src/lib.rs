@@ -95,14 +95,16 @@ pub fn run() {
                     #[cfg(target_os = "macos")]
                     {
                         use window_vibrancy::{apply_liquid_glass, apply_vibrancy, LiquidGlassOptions, NSGlassEffectViewStyle, NSVisualEffectMaterial};
-                        let glass = LiquidGlassOptions::new(NSGlassEffectViewStyle::Clear)
-                            .radius(20.0)
-                            .opaque(false);
+                        // Regular 样式（macOS 27 原生应用同款）：标准液态玻璃，含内容适配的底色，
+                        // 不是 Clear（过度透明）。tint 淡靛蓝呼应应用主题色。
+                        let glass = LiquidGlassOptions::new(NSGlassEffectViewStyle::Regular)
+                            .radius(0.0)
+                            .opaque(true);
                         if apply_liquid_glass(&window, glass).is_err() {
                             let _ = apply_vibrancy(&window, NSVisualEffectMaterial::Sidebar, None, None);
                             log_line("液态玻璃不可用（macOS < 26），已回退 sidebar vibrancy");
                         } else {
-                            log_line("已启用 macOS 液态玻璃");
+                            log_line("已启用 macOS 液态玻璃（Regular + opaque）");
                         }
                     }
                     // Windows 11 Mica（Win10 自动跳过）
