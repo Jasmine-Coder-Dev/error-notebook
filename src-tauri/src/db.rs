@@ -16,6 +16,33 @@ pub const GRADES: &[&str] = &[
 pub const TERMS: &[&str] = &["上", "下"];
 pub const SUBJECTS: &[&str] = &["语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理", "政治"];
 pub const MASTERY: &[&str] = &["未掌握", "复习中", "已掌握"];
+pub const STAGES: &[&str] = &["小学", "初中", "高中", "大学", "职业考试", "其他"];
+
+/// 按 grade 推断学段（迁移回填 & 未填学段时的兜底）。
+pub fn stage_of_grade(grade: &str) -> &'static str {
+    match grade {
+        "一年级" | "二年级" | "三年级" | "四年级" | "五年级" | "六年级" => "小学",
+        "七年级" | "八年级" | "九年级" => "初中",
+        "高一" | "高二" | "高三" => "高中",
+        _ => "其他",
+    }
+}
+
+/// 学段是否显示学期（仅 K12）。
+pub fn has_term(stage: &str) -> bool {
+    matches!(stage, "小学" | "初中" | "高中")
+}
+
+/// 题型词表（按学段，种子可自定义扩充）。
+pub fn qtype_vocab(stage: &str) -> &'static [&'static str] {
+    match stage {
+        "小学" => &["选择", "填空", "判断", "计算", "应用题", "操作作图", "口算"],
+        "初中" | "高中" => &["选择", "填空", "判断", "计算", "应用题", "实验探究", "作图证明", "阅读理解", "作文", "听力"],
+        "大学" => &["选择", "填空", "计算证明", "简答", "论述", "案例分析", "翻译", "作文"],
+        "职业考试" => &["单选", "多选", "判断", "不定项选择", "计算分析", "简答", "综合题", "案例分析", "申论"],
+        _ => &["选择", "填空", "判断", "计算", "简答", "其他"],
+    }
+}
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS questions (
@@ -30,9 +57,14 @@ CREATE TABLE IF NOT EXISTS questions (
     wrong_reason    TEXT NOT NULL DEFAULT '',
     mastery         TEXT NOT NULL DEFAULT '未掌握',
     source_file     TEXT NOT NULL DEFAULT '',
-    created_at      TEXT NOT NULL DEFAULT ''
+    created_at      TEXT NOT NULL DEFAULT '',
+    stage           TEXT NOT NULL DEFAULT '',
+    qtype           TEXT NOT NULL DEFAULT ''
 );
 ";
+
+/// 列名列表（SELECT 显式列出，避免新增列后索引错位）。
+const COLUMNS: &str = "id, text, answer, grade, term, subject, knowledge_points, is_wrong, wrong_reason, mastery, source_file, created_at, stage, qtype";
 
 /// 数据目录：~/.cuotiji（与 Python 版一致）。
 pub fn data_dir() -> PathBuf {
@@ -52,7 +84,40 @@ pub fn conn() -> Result<Connection, String> {
     std::fs::create_dir_all(data_dir()).map_err(|e| e.to_string())?;
     let c = Connection::open(db_path()).map_err(|e| e.to_string())?;
     c.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
+    migrate(&c)?;
     Ok(c)
+}
+
+/// 一期迁移：补 stage / qtype 两列并按 grade 回填学段（幂等，旧数据零破坏）。
+fn migrate(c: &Connection) -> Result<(), String> {
+    let cols: Vec<String> = c
+        .prepare("PRAGMA table_info(questions)")
+        .and_then(|mut stmt| {
+            stmt.query_map([], |r| r.get::<_, String>(1))
+                .map(|rows| rows.collect::<Result<Vec<_>, _>>())
+        })
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    if !cols.iter().any(|c| c == "stage") {
+        c.execute("ALTER TABLE questions ADD COLUMN stage TEXT NOT NULL DEFAULT ''", [])
+            .map_err(|e| e.to_string())?;
+    }
+    if !cols.iter().any(|c| c == "qtype") {
+        c.execute("ALTER TABLE questions ADD COLUMN qtype TEXT NOT NULL DEFAULT ''", [])
+            .map_err(|e| e.to_string())?;
+    }
+    // 回填：空 stage 按 grade 推断
+    c.execute(
+        "UPDATE questions SET stage = CASE
+            WHEN grade IN ('一年级','二年级','三年级','四年级','五年级','六年级') THEN '小学'
+            WHEN grade IN ('七年级','八年级','九年级') THEN '初中'
+            WHEN grade IN ('高一','高二','高三') THEN '高中'
+            ELSE '其他' END
+         WHERE stage = ''",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// 对齐 Python gen_id：毫秒时间戳 hex + 4 字节随机 hex（共 8 位）。
@@ -73,7 +138,7 @@ fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// 对齐 Python db.normalize：字段规范化。
+/// 字段规范化（受众扩展一期：stage/qtype；grade/subject 语义升级为分类一/二，支持自由输入）。
 pub fn normalize(data: &Map<String, Value>) -> Map<String, Value> {
     let get_s = |k: &str| -> Option<String> {
         data.get(k).and_then(|v| {
@@ -99,18 +164,15 @@ pub fn normalize(data: &Map<String, Value>) -> Map<String, Value> {
         _ => vec![],
     };
 
-    let pick = |key: &str, valid: &[&str], default: &str| -> Value {
-        match get_s(key) {
-            Some(v) if valid.contains(&v.as_str()) => json!(v),
-            Some(v) => json!(v), // Python 行为：未知但非空的值原样保留
-            None => json!(default),
-        }
+    let grade = get_s("grade").unwrap_or_default();
+    // 学段：合法值保留；否则按 grade 推断；兜底「其他」
+    let stage = match get_s("stage") {
+        Some(v) if STAGES.contains(&v.as_str()) => v,
+        _ => stage_of_grade(&grade).to_string(),
     };
-    // 注意：Python 对 grade/term/subject 是「在列表中保留，否则原样（空则默认）」；
-    // 对 mastery 是「不在列表中一律默认 未掌握」。
-    let grade = pick("grade", GRADES, GRADES[0]);
-    let term = pick("term", TERMS, TERMS[0]);
-    let subject = pick("subject", SUBJECTS, SUBJECTS[1]);
+    // 学期：仅 K12 学段保留；大学/职业考试等存空
+    let term = if has_term(&stage) { get_s("term").unwrap_or_default() } else { String::new() };
+    let subject = get_s("subject").unwrap_or_default();
     let mastery = match get_s("mastery") {
         Some(v) if MASTERY.contains(&v.as_str()) => json!(v),
         _ => json!("未掌握"),
@@ -129,15 +191,17 @@ pub fn normalize(data: &Map<String, Value>) -> Map<String, Value> {
     m.insert("id".into(), json!(id));
     m.insert("text".into(), json!(get_s("text").unwrap_or_default()));
     m.insert("answer".into(), json!(get_s("answer").unwrap_or_default()));
-    m.insert("grade".into(), grade);
-    m.insert("term".into(), term);
-    m.insert("subject".into(), subject);
+    m.insert("grade".into(), json!(grade));
+    m.insert("term".into(), json!(term));
+    m.insert("subject".into(), json!(subject));
     m.insert("knowledgePoints".into(), json!(kps));
     m.insert("isWrong".into(), json!(is_wrong));
     m.insert("wrongReason".into(), json!(get_s("wrongReason").or_else(|| get_s("wrong_reason")).unwrap_or_default()));
     m.insert("mastery".into(), mastery);
     m.insert("sourceFile".into(), json!(get_s("sourceFile").or_else(|| get_s("source_file")).unwrap_or_default()));
     m.insert("createdAt".into(), json!(created));
+    m.insert("stage".into(), json!(stage));
+    m.insert("qtype".into(), json!(get_s("qtype").unwrap_or_default()));
     m
 }
 
@@ -153,45 +217,52 @@ pub fn now_iso() -> String {
         .unwrap_or_default()
 }
 
-/// 对齐 Python db.row_to_q：行 → camelCase JSON。
+/// 行 → camelCase JSON（按列名取，新增列安全）。
 pub fn row_to_q(row: &rusqlite::Row) -> rusqlite::Result<Map<String, Value>> {
-    let kps: Vec<Value> = serde_json::from_str(&row.get::<_, String>(6)?)
+    let get = |name: &str| -> rusqlite::Result<String> { row.get(name) };
+    let kps: Vec<Value> = serde_json::from_str(&get("knowledge_points")?)
         .unwrap_or_else(|_| vec![]);
     let mut m = Map::new();
-    m.insert("id".into(), json!(row.get::<_, String>(0)?));
-    m.insert("text".into(), json!(row.get::<_, String>(1)?));
-    m.insert("answer".into(), json!(row.get::<_, String>(2)?));
-    m.insert("grade".into(), json!(row.get::<_, String>(3)?));
-    m.insert("term".into(), json!(row.get::<_, String>(4)?));
-    m.insert("subject".into(), json!(row.get::<_, String>(5)?));
+    m.insert("id".into(), json!(get("id")?));
+    m.insert("text".into(), json!(get("text")?));
+    m.insert("answer".into(), json!(get("answer")?));
+    m.insert("grade".into(), json!(get("grade")?));
+    m.insert("term".into(), json!(get("term")?));
+    m.insert("subject".into(), json!(get("subject")?));
     m.insert("knowledgePoints".into(), json!(kps));
-    m.insert("isWrong".into(), json!(row.get::<_, i32>(7)? != 0));
-    m.insert("wrongReason".into(), json!(row.get::<_, String>(8)?));
-    m.insert("mastery".into(), json!(row.get::<_, String>(9)?));
-    m.insert("sourceFile".into(), json!(row.get::<_, String>(10)?));
-    m.insert("createdAt".into(), json!(row.get::<_, String>(11)?));
+    m.insert("isWrong".into(), json!(row.get::<&str, i32>("is_wrong")? != 0));
+    m.insert("wrongReason".into(), json!(get("wrong_reason")?));
+    m.insert("mastery".into(), json!(get("mastery")?));
+    m.insert("sourceFile".into(), json!(get("source_file")?));
+    m.insert("createdAt".into(), json!(get("created_at")?));
+    m.insert("stage".into(), json!(get("stage")?));
+    m.insert("qtype".into(), json!(get("qtype")?));
     Ok(m)
 }
 
 #[derive(Default)]
 pub struct Filters {
+    pub stage: String,
     pub grade: String,
     pub term: String,
     pub subject: String,
     pub kp: String,
+    pub qtype: String,
     pub mastery: String,
     pub only_wrong: bool,
     pub keyword: String,
 }
 
-/// 对齐 Python db.list_questions：服务端组合筛选，ORDER BY rowid。
+/// 组合筛选：stage/grade/term/subject/kp/qtype/mastery/onlyWrong/keyword，ORDER BY rowid。
 pub fn list_questions(f: &Filters) -> Result<Vec<Map<String, Value>>, String> {
     let mut cond: Vec<String> = vec![];
     let mut args: Vec<String> = vec![];
+    if !f.stage.is_empty() { cond.push("stage = ?".into()); args.push(f.stage.clone()); }
     if !f.grade.is_empty() { cond.push("grade = ?".into()); args.push(f.grade.clone()); }
     if !f.term.is_empty() { cond.push("term = ?".into()); args.push(f.term.clone()); }
     if !f.subject.is_empty() { cond.push("subject = ?".into()); args.push(f.subject.clone()); }
     if !f.kp.is_empty() { cond.push("knowledge_points LIKE ?".into()); args.push(format!("%\"{}\"%", f.kp)); }
+    if !f.qtype.is_empty() { cond.push("qtype = ?".into()); args.push(f.qtype.clone()); }
     if !f.mastery.is_empty() { cond.push("mastery = ?".into()); args.push(f.mastery.clone()); }
     if f.only_wrong { cond.push("is_wrong = 1".into()); }
     if !f.keyword.is_empty() {
@@ -199,7 +270,8 @@ pub fn list_questions(f: &Filters) -> Result<Vec<Map<String, Value>>, String> {
         for _ in 0..4 { args.push(format!("%{}%", f.keyword)); }
     }
     let sql = format!(
-        "SELECT * FROM questions{} ORDER BY rowid",
+        "SELECT {} FROM questions{} ORDER BY rowid",
+        COLUMNS,
         if cond.is_empty() { String::new() } else { format!(" WHERE {}", cond.join(" AND ")) }
     );
     let c = conn()?;
@@ -215,8 +287,8 @@ pub fn list_questions(f: &Filters) -> Result<Vec<Map<String, Value>>, String> {
 fn insert(c: &Connection, q: &Map<String, Value>) -> Result<(), String> {
     c.execute(
         "INSERT OR REPLACE INTO questions (id, text, answer, grade, term, subject, \
-         knowledge_points, is_wrong, wrong_reason, mastery, source_file, created_at) \
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+         knowledge_points, is_wrong, wrong_reason, mastery, source_file, created_at, stage, qtype) \
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         params![
             q["id"].as_str().unwrap_or(""),
             q["text"].as_str().unwrap_or(""),
@@ -230,6 +302,8 @@ fn insert(c: &Connection, q: &Map<String, Value>) -> Result<(), String> {
             q["mastery"].as_str().unwrap_or(""),
             q["sourceFile"].as_str().unwrap_or(""),
             q["createdAt"].as_str().unwrap_or(""),
+            q["stage"].as_str().unwrap_or(""),
+            q["qtype"].as_str().unwrap_or(""),
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -299,4 +373,75 @@ pub fn replace_all(items: &[Value]) -> Result<Vec<Map<String, Value>>, String> {
         insert(&c, q)?;
     }
     Ok(normalized)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn norm(v: Value) -> Map<String, Value> {
+        normalize(v.as_object().unwrap())
+    }
+
+    #[test]
+    fn normalize_derives_stage_from_grade() {
+        let q = norm(json!({"text": "t", "grade": "三年级"}));
+        assert_eq!(q["stage"], "小学");
+        let q = norm(json!({"text": "t", "grade": "高一"}));
+        assert_eq!(q["stage"], "高中");
+        let q = norm(json!({"text": "t", "grade": "七年级"}));
+        assert_eq!(q["stage"], "初中");
+        let q = norm(json!({"text": "t", "grade": ""}));
+        assert_eq!(q["stage"], "其他");
+    }
+
+    #[test]
+    fn normalize_keeps_explicit_stage() {
+        let q = norm(json!({"text": "t", "stage": "大学", "grade": "高等数学"}));
+        assert_eq!(q["stage"], "大学");
+        assert_eq!(q["grade"], "高等数学");
+        assert_eq!(q["term"], ""); // 大学无学期
+        let q = norm(json!({"text": "t", "stage": "职业考试", "grade": "中级会计", "subject": "财务管理", "term": "上"}));
+        assert_eq!(q["stage"], "职业考试");
+        assert_eq!(q["subject"], "财务管理");
+        assert_eq!(q["term"], ""); // 学期被清空
+    }
+
+    #[test]
+    fn normalize_k12_keeps_term() {
+        let q = norm(json!({"text": "t", "stage": "小学", "grade": "三年级", "term": "下"}));
+        assert_eq!(q["term"], "下");
+    }
+
+    #[test]
+    fn normalize_carries_qtype() {
+        let q = norm(json!({"text": "t", "stage": "高中", "grade": "高一", "qtype": "选择"}));
+        assert_eq!(q["qtype"], "选择");
+        let q = norm(json!({"text": "t", "grade": "三年级"}));
+        assert_eq!(q["qtype"], "");
+    }
+
+    #[test]
+    fn normalize_free_input_classification() {
+        let q = norm(json!({"text": "t", "stage": "大学", "grade": "机器学习导论", "subject": "第三章 神经网络"}));
+        assert_eq!(q["grade"], "机器学习导论");
+        assert_eq!(q["subject"], "第三章 神经网络");
+    }
+
+    #[test]
+    fn stage_of_grade_mapping() {
+        assert_eq!(stage_of_grade("六年级"), "小学");
+        assert_eq!(stage_of_grade("九年级"), "初中");
+        assert_eq!(stage_of_grade("高三"), "高中");
+        assert_eq!(stage_of_grade("随便"), "其他");
+    }
+
+    #[test]
+    fn qtype_vocab_by_stage() {
+        assert!(qtype_vocab("小学").contains(&"口算"));
+        assert!(qtype_vocab("职业考试").contains(&"申论"));
+        assert!(qtype_vocab("大学").contains(&"计算证明"));
+        assert!(qtype_vocab("高中").contains(&"实验探究"));
+    }
 }

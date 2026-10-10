@@ -54,13 +54,15 @@ fn db_err(e: String) -> ApiError {
 
 #[derive(serde::Deserialize, Default)]
 pub struct ListQuery {
+    pub stage: Option<String>,
     pub grade: Option<String>,
     pub term: Option<String>,
     pub subject: Option<String>,
     pub kp: Option<String>,
-    pub mastery: Option<String>,
+    pub qtype: Option<String>,
     #[allow(non_snake_case)]
     pub onlyWrong: Option<String>,
+    pub mastery: Option<String>,
     pub keyword: Option<String>,
 }
 
@@ -74,10 +76,12 @@ fn parse_bool(s: &Option<String>) -> bool {
 
 async fn list_questions(State(_st): State<AppState>, Query(q): Query<ListQuery>) -> Result<Json<Value>, ApiError> {
     let filters = db::Filters {
+        stage: q.stage.unwrap_or_default(),
         grade: q.grade.unwrap_or_default(),
         term: q.term.unwrap_or_default(),
         subject: q.subject.unwrap_or_default(),
         kp: q.kp.unwrap_or_default(),
+        qtype: q.qtype.unwrap_or_default(),
         mastery: q.mastery.unwrap_or_default(),
         only_wrong: parse_bool(&q.onlyWrong),
         keyword: q.keyword.unwrap_or_default(),
@@ -181,21 +185,32 @@ async fn save_settings(body: Json<Map<String, Value>>) -> Result<Json<Value>, Ap
 
 #[derive(serde::Deserialize, Default)]
 pub struct CatalogQuery {
+    pub stage: Option<String>,
     pub grade: Option<String>,
     pub term: Option<String>,
     pub subject: Option<String>,
 }
 
+/// 目录条目是否匹配查询（大学忽略学期/章节；其余按学段语义匹配）。
+fn entry_matches(entry: &Value, stage: &str, grade: &str, term: &str, subject: &str) -> bool {
+    if !stage.is_empty() && entry.get("stage").and_then(|v| v.as_str()) != Some(stage) { return false; }
+    if !grade.is_empty() && entry.get("grade").and_then(|v| v.as_str()) != Some(grade) { return false; }
+    match stage {
+        "大学" => true, // 学期/章节不适用
+        "职业考试" => subject.is_empty() || entry.get("subject").and_then(|v| v.as_str()) == Some(subject),
+        _ => term.is_empty() || entry.get("term").and_then(|v| v.as_str()) == Some(term),
+    }
+}
+
 async fn get_catalog(State(st): State<AppState>, Query(q): Query<CatalogQuery>) -> Json<Value> {
+    let stage = q.stage.unwrap_or_default();
     let grade = q.grade.unwrap_or_default();
     let term = q.term.unwrap_or_default();
     let subject = q.subject.unwrap_or_default();
     let mut seen = std::collections::HashSet::new();
     let mut points = vec![];
     for entry in &st.catalog {
-        if !grade.is_empty() && entry.get("grade").and_then(|v| v.as_str()) != Some(grade.as_str()) { continue; }
-        if !term.is_empty() && entry.get("term").and_then(|v| v.as_str()) != Some(term.as_str()) { continue; }
-        if !subject.is_empty() && entry.get("subject").and_then(|v| v.as_str()) != Some(subject.as_str()) { continue; }
+        if !entry_matches(entry, &stage, &grade, &term, &subject) { continue; }
         if let Some(arr) = entry.get("points").and_then(|v| v.as_array()) {
             for p in arr {
                 if let Some(s) = p.as_str() {
@@ -209,21 +224,20 @@ async fn get_catalog(State(st): State<AppState>, Query(q): Query<CatalogQuery>) 
     Json(json!({"knowledge_points": points}))
 }
 
+/// AI 打标的目录约束：K12 按 学段+年级+学期+科目；大学按 课程；职业考试按 项目+科目。
 fn catalog_for(st: &AppState, payload: &Map<String, Value>) -> Vec<String> {
+    let stage = payload.get("stage").and_then(|v| v.as_str()).unwrap_or("");
     let grade = payload.get("grade").and_then(|v| v.as_str()).unwrap_or("");
     let term = payload.get("term").and_then(|v| v.as_str()).unwrap_or("");
     let subject = payload.get("subject").and_then(|v| v.as_str()).unwrap_or("");
+    let mut points = vec![];
     for entry in &st.catalog {
-        if entry.get("grade").and_then(|v| v.as_str()) == Some(grade)
-            && entry.get("term").and_then(|v| v.as_str()) == Some(term)
-            && entry.get("subject").and_then(|v| v.as_str()) == Some(subject)
-        {
-            if let Some(arr) = entry.get("points").and_then(|v| v.as_array()) {
-                return arr.iter().filter_map(|p| p.as_str().map(|s| s.to_string())).collect();
-            }
+        if !entry_matches(entry, stage, grade, term, subject) { continue; }
+        if let Some(arr) = entry.get("points").and_then(|v| v.as_array()) {
+            points.extend(arr.iter().filter_map(|p| p.as_str().map(|s| s.to_string())));
         }
     }
-    vec![]
+    points
 }
 
 // ---------------- AI 任务 ----------------

@@ -13,6 +13,50 @@ localStorage 仅用于一次性迁移标记：
   const TERMS = ['上', '下'];
   const SUBJECTS = ['语文', '数学', '英语', '物理', '化学', '生物', '历史', '地理', '政治'];
   const MASTERY = ['未掌握', '复习中', '已掌握'];
+  /* 学段（受众扩展一期，见 docs/受众扩展方案.md §3） */
+  const STAGES = ['小学', '初中', '高中', '大学', '职业考试', '其他'];
+  const K12_STAGES = ['小学', '初中', '高中'];
+
+  function hasTerm(stage) { return K12_STAGES.includes(stage); }
+
+  function stageOfGrade(grade) {
+    if (GRADES.indexOf(grade) <= 5 && grade) return '小学';
+    if (['七年级', '八年级', '九年级'].includes(grade)) return '初中';
+    if (['高一', '高二', '高三'].includes(grade)) return '高中';
+    return '其他';
+  }
+
+  /* 题型词表（按学段，种子可扩充） */
+  const QTYPE_VOCAB = {
+    '小学': ['选择', '填空', '判断', '计算', '应用题', '操作作图', '口算'],
+    '初中': ['选择', '填空', '判断', '计算', '应用题', '实验探究', '作图证明', '阅读理解', '作文', '听力'],
+    '高中': ['选择', '填空', '判断', '计算', '应用题', '实验探究', '作图证明', '阅读理解', '作文', '听力'],
+    '大学': ['选择', '填空', '计算证明', '简答', '论述', '案例分析', '翻译', '作文'],
+    '职业考试': ['单选', '多选', '判断', '不定项选择', '计算分析', '简答', '综合题', '案例分析', '申论'],
+    '其他': ['选择', '填空', '判断', '计算', '简答', '其他']
+  };
+
+  /* 分类建议种子（与 catalog.json 种子一致；录入时与输入历史合并去重） */
+  const CLASSIFY_SEEDS = {
+    '大学': [
+      { grade: '高等数学', subject: '' },
+      { grade: '线性代数', subject: '' },
+      { grade: '概率论与数理统计', subject: '' },
+      { grade: '大学英语（四六级）', subject: '' }
+    ],
+    '职业考试': [
+      { grade: '中级会计', subject: '中级会计实务' },
+      { grade: '中级会计', subject: '财务管理' },
+      { grade: '中级会计', subject: '经济法' },
+      { grade: '法考', subject: '民法' },
+      { grade: '法考', subject: '刑法' },
+      { grade: '法考', subject: '诉讼法' },
+      { grade: '教资', subject: '科目二（教育知识与能力）' },
+      { grade: '公务员', subject: '行测' },
+      { grade: '考研', subject: '政治' }
+    ],
+    '其他': []
+  };
 
   const LS_DATA_KEY = 'cuotiji_questions';
   const LS_MIGRATED_KEY = 'cuotiji_migrated';
@@ -68,7 +112,7 @@ localStorage 仅用于一次性迁移标记：
     window.dispatchEvent(new CustomEvent('cjt:migrated', { detail: r.inserted || 0 }));
   }
 
-  CJT.CONST = { GRADES, TERMS, SUBJECTS, MASTERY };
+  CJT.CONST = { GRADES, TERMS, SUBJECTS, MASTERY, STAGES, K12_STAGES, QTYPE_VOCAB, CLASSIFY_SEEDS, hasTerm, stageOfGrade };
 
   CJT.store = {
     all() { return questions.slice(); },
@@ -218,6 +262,24 @@ localStorage 仅用于一次性迁移标记：
       grade: '八年级', term: '下', subject: '语文',
       knowledgePoints: ['古诗词默写'],
       isWrong: true, wrongReason: '“涯”写成“崖”', mastery: '复习中',
+      sourceFile: '示例数据', createdAt: now
+    },
+    {
+      text: '求极限：lim(x→0) sin(3x) / x = ？',
+      answer: '3。利用等价无穷小 sin(3x) ~ 3x，原式 = lim 3x/x = 3。',
+      grade: '高等数学', subject: '第一章 函数与极限',
+      knowledgePoints: ['极限', '等价无穷小'],
+      isWrong: true, wrongReason: '等价无穷小替换条件记错', mastery: '未掌握',
+      qtype: '计算证明', stage: '大学',
+      sourceFile: '示例数据', createdAt: now
+    },
+    {
+      text: '（单选）企业取得长期股权投资时，初始投资成本小于应享有被投资单位可辨认净资产公允价值份额的，其差额应计入（　）。A.营业外收入 B.资本公积 C.商誉 D.其他综合收益',
+      answer: 'A。差额计入当期损益（营业外收入）。',
+      grade: '中级会计', subject: '中级会计实务',
+      knowledgePoints: ['长期股权投资'],
+      isWrong: true, wrongReason: '与商誉处理混淆', mastery: '复习中',
+      qtype: '单选', stage: '职业考试',
       sourceFile: '示例数据', createdAt: now
     }
   ];

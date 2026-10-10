@@ -3,173 +3,281 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
-  <title>学生错题集</title>
+  <title>错题集</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<header class="app-header">
-  <div class="header-inner">
-    <h1 class="logo">学生错题集</h1>
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-view="import">录入题目</button>
-      <button class="tab" data-view="bank">错题集</button>
-      <button class="tab" data-view="paper">组卷打印</button>
-      <button class="tab" data-view="analysis">知识点分析</button>
+<div class="shell">
+  <!-- ============ 左侧导航栏（方案 §5.1，220px/56px 折叠） ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="side-brand" title="错题集">
+      <span class="side-brand-icon">🗂</span><span class="side-brand-text">错题集</span>
+    </div>
+    <nav class="side-nav" id="sideNav">
+      <button class="side-item active" data-view="import"><span class="side-icon">➕</span><span class="side-text">录入题目</span></button>
+      <button class="side-item" data-view="bank"><span class="side-icon">🗂</span><span class="side-text">错题集</span></button>
+      <button class="side-item" data-view="paper"><span class="side-icon">🖨</span><span class="side-text">组卷打印</span></button>
+      <button class="side-item" data-view="analysis"><span class="side-icon">📊</span><span class="side-text">学情分析</span></button>
     </nav>
-    <div class="data-actions">
-      <button class="btn ghost" id="btnTheme" type="button" title="切换外观：自动 / 浅色 / 深色">🌗 外观</button>
-      <button class="btn ghost" id="btnAiSettings" type="button">AI 设置</button>
-      <button class="btn ghost" id="btnExport" type="button">导出数据</button>
-      <button class="btn ghost" id="btnImport" type="button">导入数据</button>
-      <input type="file" id="importFile" accept="application/json,.json" hidden>
-      <button class="btn ghost" id="btnSample" type="button">加载示例数据</button>
+    <div class="side-sep"></div>
+    <div class="side-foot">
+      <button class="side-item" id="btnDataMenu"><span class="side-icon">💾</span><span class="side-text">数据管理</span></button>
+      <button class="side-item" id="btnAiSettings"><span class="side-icon">⚙️</span><span class="side-text">AI 设置</span></button>
+      <button class="side-item" id="btnTheme"><span class="side-icon">🌗</span><span class="side-text">外观</span></button>
+      <button class="side-item side-collapse" id="btnCollapse" title="折叠/展开侧栏"><span class="side-icon">⟨</span><span class="side-text">收起</span></button>
     </div>
+  </aside>
+
+  <!-- ============ 内容区 ============ -->
+  <div class="main">
+    <main id="app">
+
+      <!-- ====== 视图：录入题目 ====== -->
+      <section id="view-import" class="view active">
+        <div class="card">
+          <h2 class="card-title">录入题目</h2>
+          <!-- 步骤条（方案 §5.7） -->
+          <ol class="steps" id="importSteps">
+            <li class="step current"><i>1</i>选择学段</li>
+            <li class="step"><i>2</i>上传或输入</li>
+            <li class="step"><i>3</i>预览确认</li>
+          </ol>
+          <!-- 学段选择器 -->
+          <div class="stage-row">
+            <span class="field-label">学段
+              <span class="hint-tip" data-tip-key="tipStage">?</span>
+            </span>
+            <div class="stage-chips" id="stageChips"></div>
+          </div>
+          <p class="hint" id="stageHint"></p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h2 class="card-title">上传试卷（PDF）</h2>
+            <div id="dropZone" class="drop-zone">
+              <p class="drop-text">把 PDF 试卷拖到这里</p>
+              <p class="drop-sub">或 <span class="link">点击选择文件</span></p>
+              <input type="file" id="pdfFile" accept="application/pdf" hidden>
+            </div>
+            <p id="pdfStatus" class="status"></p>
+
+            <div id="importMeta" class="import-meta" hidden>
+              <div class="meta-row">
+                <label id="lblImpGrade">年级
+                  <select id="impGrade"></select>
+                  <input type="text" id="impGradeInput" class="classify-input" list="dlGrade" placeholder="输入或选择" hidden>
+                  <datalist id="dlGrade"></datalist>
+                </label>
+                <label id="lblImpTerm">学期
+                  <select id="impTerm"></select>
+                </label>
+                <label id="lblImpSubject">科目
+                  <select id="impSubject"></select>
+                  <input type="text" id="impSubjectInput" class="classify-input" list="dlSubject" placeholder="输入或选择" hidden>
+                  <datalist id="dlSubject"></datalist>
+                </label>
+              </div>
+              <div class="meta-row">
+                <p class="hint">共识别 <b id="impCount">0</b> 道题。已勾选「错题」的才会入错题本；文字识别不准可直接改。</p>
+                <button id="btnAiSplitCheck" class="btn" type="button">AI 校对切分</button>
+                <button id="btnAiTagAll" class="btn" type="button">全部 AI 打标</button>
+                <button id="btnImportAll" class="btn primary" type="button">确认入库</button>
+              </div>
+              <p class="hint ai-sub" id="aiSplitSub"></p>
+            </div>
+
+            <div id="previewList" class="preview-list"></div>
+          </div>
+
+          <div class="card">
+            <h2 class="card-title">手动添加</h2>
+            <form id="manualForm" class="form">
+              <label class="field">
+                <span class="field-label">题目 <i class="req">*</i>
+                  <button type="button" class="btn small" id="btnAiSolve">AI 生成答案</button>
+                </span>
+                <span class="ai-sub" id="aiSolveSub"></span>
+                <textarea id="mText" rows="4" required placeholder="把题目内容打进来，或粘贴"></textarea>
+              </label>
+              <label class="field">
+                <span class="field-label">答案 / 讲解</span>
+                <textarea id="mAnswer" rows="3" placeholder="可选：答案或讲解"></textarea>
+              </label>
+              <div class="form-row">
+                <label class="field" id="lblMGrade">
+                  <span class="field-label" id="mGradeLabel">年级</span>
+                  <select id="mGrade"></select>
+                  <input type="text" id="mGradeInput" class="classify-input" list="dlGrade2" placeholder="输入或选择" hidden>
+                  <datalist id="dlGrade2"></datalist>
+                </label>
+                <label class="field" id="lblMTerm">
+                  <span class="field-label">学期</span>
+                  <select id="mTerm"></select>
+                </label>
+                <label class="field" id="lblMSubject">
+                  <span class="field-label" id="mSubjectLabel">科目</span>
+                  <select id="mSubject"></select>
+                  <input type="text" id="mSubjectInput" class="classify-input" list="dlSubject2" placeholder="输入或选择" hidden>
+                  <datalist id="dlSubject2"></datalist>
+                </label>
+              </div>
+              <div class="form-row two">
+                <label class="field">
+                  <span class="field-label">题型
+                    <span class="hint-tip" data-tip-key="tipQtype">?</span>
+                  </span>
+                  <select id="mQtype"></select>
+                </label>
+                <label class="field">
+                  <span class="field-label">错误原因</span>
+                  <input type="text" id="mReason" placeholder="比如：计算粗心、概念不清">
+                </label>
+              </div>
+              <label class="field">
+                <span class="field-label">知识点（用逗号隔开）
+                  <button type="button" class="btn small" id="btnAiTag">AI 打标</button>
+                  <span class="hint-tip" data-tip-key="tipKp">?</span>
+                </span>
+                <span class="ai-sub" id="aiTagSub"></span>
+                <input type="text" id="mKp" placeholder="比如：分数乘法, 约分">
+              </label>
+              <label class="check-field">
+                <input type="checkbox" id="mWrong" checked>
+                <span>标记为错题
+                  <span class="hint-tip" data-tip-key="tipWrong">?</span>
+                </span>
+              </label>
+              <button class="btn primary block" type="submit">保存题目</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====== 视图：错题集 ====== -->
+      <section id="view-bank" class="view">
+        <div class="card">
+          <h2 class="card-title">错题集 <span class="count-badge" id="bankCount">0 题</span></h2>
+          <div class="filter-bar">
+            <select id="fStage"><option value="">全部学段</option></select>
+            <select id="fGrade"><option value="">全部分类一</option></select>
+            <select id="fTerm"><option value="">全部学期</option></select>
+            <select id="fSubject"><option value="">全部分类二</option></select>
+            <select id="fQtype"><option value="">全部题型</option></select>
+            <select id="fKp"><option value="">全部知识点</option></select>
+            <select id="fMastery"><option value="">全部状态</option></select>
+            <input type="search" id="fKeyword" placeholder="搜题干 / 答案 / 原因">
+            <button class="btn ghost" id="btnClearFilter" type="button">清空筛选</button>
+          </div>
+        </div>
+        <div id="bankList" class="bank-list"></div>
+        <div id="bankEmpty" class="empty-state" hidden>
+          <p class="empty-text"></p>
+          <button class="btn primary" id="btnGoImport" type="button">去录题</button>
+        </div>
+      </section>
+
+      <!-- ====== 视图：组卷打印 ====== -->
+      <section id="view-paper" class="view">
+        <div class="card">
+          <h2 class="card-title">组卷打印</h2>
+          <div class="filter-bar">
+            <select id="pStage"><option value="">全部学段</option></select>
+            <select id="pGrade"><option value="">全部分类一</option></select>
+            <select id="pTerm"><option value="">全部学期</option></select>
+            <select id="pSubject"><option value="">全部分类二</option></select>
+            <select id="pKp"><option value="">全部知识点</option></select>
+            <select id="pMastery"><option value="">全部状态</option></select>
+            <label class="check-field inline">
+              <input type="checkbox" id="pOnlyWrong" checked>
+              <span>只抽错题</span>
+            </label>
+            <label class="count-field">
+              抽几题
+              <input type="number" id="pCount" min="1" max="100" value="10">
+            </label>
+            <label class="check-field inline">
+              <input type="checkbox" id="pWithAnswers" checked>
+              <span>附答案页</span>
+            </label>
+            <button class="btn primary" id="btnGenPaper" type="button">生成试卷</button>
+            <button class="btn" id="btnPrint" type="button" disabled>打印</button>
+          </div>
+          <p class="hint" id="paperHint">选好条件点「生成试卷」，先预览再打印。</p>
+        </div>
+        <div id="paperPreview"></div>
+      </section>
+
+      <!-- ====== 视图：学情分析 ====== -->
+      <section id="view-analysis" class="view">
+        <div class="card">
+          <h2 class="card-title">学情分析</h2>
+          <div class="filter-bar">
+            <select id="aStage"><option value="">全部学段</option></select>
+            <select id="aGrade"><option value="">全部分类一</option></select>
+            <select id="aSubject"><option value="">全部分类二</option></select>
+            <div class="ana-tabs">
+              <button class="ana-tab active" data-ana="qtype" type="button">题型统计</button>
+              <button class="ana-tab" data-ana="kp" type="button">知识点统计</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 摘要卡片 -->
+        <div class="summary-cards" id="summaryCards">
+          <div class="sum-card"><span class="sum-num" id="sumTotal">0</span><span class="sum-label">错题总数</span></div>
+          <div class="sum-card"><span class="sum-num" id="sumQtype">—</span><span class="sum-label">最弱题型</span></div>
+          <div class="sum-card"><span class="sum-num" id="sumKp">—</span><span class="sum-label">最弱知识点</span></div>
+        </div>
+
+        <!-- 题型统计 -->
+        <div class="card ana-panel" id="anaPanelQtype">
+          <div class="panel-head">
+            <h3>哪种题型错最多</h3>
+            <div class="chart-toggle">
+              <button class="btn small active" id="btnChartBar" type="button">柱状图</button>
+              <button class="btn small" id="btnChartPie" type="button">饼图</button>
+            </div>
+          </div>
+          <div id="qtypeChart" class="chart"></div>
+          <p class="hint">点某一行，查看该题型的全部错题。</p>
+          <div class="panel-foot">
+            <button class="btn" id="btnAiQtype" type="button" hidden>AI 批量补标题型</button>
+            <span class="ai-sub" id="aiQtypeSub"></span>
+          </div>
+        </div>
+
+        <!-- 知识点统计 -->
+        <div class="card ana-panel" id="anaPanelKp" hidden>
+          <div class="panel-head">
+            <h3>哪个知识点最薄弱</h3>
+            <label class="check-field inline">
+              <input type="checkbox" id="aAllMastery">
+              <span>计入已掌握</span>
+            </label>
+          </div>
+          <div id="kpChart" class="chart"></div>
+          <p class="hint">默认只统计「未掌握 + 复习中」的错题；点某一行可直接针对它出题。条尾小色条显示该知识点的掌握情况（红＝未掌握，黄＝复习中，绿＝已掌握）。</p>
+        </div>
+
+        <div id="analysisEmpty" class="empty-state" hidden>
+          <p class="empty-text"></p>
+          <button class="btn primary" id="btnGoImport2" type="button">去录题</button>
+        </div>
+      </section>
+
+    </main>
   </div>
-</header>
+</div>
 
-<main id="app">
-
-  <!-- ============ 视图：录入题目 ============ -->
-  <section id="view-import" class="view active">
-    <div class="grid-2">
-
-      <div class="card">
-        <h2 class="card-title">PDF 上传录入</h2>
-        <div id="dropZone" class="drop-zone">
-          <p class="drop-text">将 PDF / Word / 图片拖拽到此处</p>
-          <p class="drop-sub">或 <span class="link">点击选择文件</span>（.pdf .docx .png .jpg .jpeg .webp）</p>
-          <input type="file" id="pdfFile" accept=".pdf,.docx,.png,.jpg,.jpeg,.webp,application/pdf" hidden>
-        </div>
-        <p id="pdfStatus" class="status"></p>
-
-        <div id="importMeta" class="import-meta" hidden>
-          <div class="meta-row">
-            <label>年级
-              <select id="impGrade"></select>
-            </label>
-            <label>学期
-              <select id="impTerm"></select>
-            </label>
-            <label>科目
-              <select id="impSubject"></select>
-            </label>
-          </div>
-          <div class="meta-row">
-            <p class="hint">共识别 <b id="impCount">0</b> 道题，默认全部「标记为错题」，可在下方逐题修改文本、取消勾选或删除。</p>
-            <button id="btnAiSplitCheck" class="btn" type="button">AI 校对切分</button>
-            <button id="btnAiTagAll" class="btn" type="button">全部 AI 打标</button>
-            <button id="btnImportAll" class="btn primary" type="button">一键入库</button>
-          </div>
-        </div>
-
-        <div id="previewList" class="preview-list"></div>
-      </div>
-
-      <div class="card">
-        <h2 class="card-title">手动添加题目</h2>
-        <form id="manualForm" class="form">
-          <label class="field">
-            <span class="field-label">题干 <i class="req">*</i></span>
-            <textarea id="mText" rows="4" required placeholder="请输入题目内容"></textarea>
-          </label>
-          <label class="field">
-            <span class="field-label">答案 / 解析 <button type="button" class="btn small" id="btnAiSolve">AI 生成答案解析</button></span>
-            <textarea id="mAnswer" rows="3" placeholder="请输入答案或解析（可选）"></textarea>
-          </label>
-          <div class="form-row">
-            <label class="field">
-              <span class="field-label">年级</span>
-              <select id="mGrade"></select>
-            </label>
-            <label class="field">
-              <span class="field-label">学期</span>
-              <select id="mTerm"></select>
-            </label>
-            <label class="field">
-              <span class="field-label">科目</span>
-              <select id="mSubject"></select>
-            </label>
-          </div>
-          <label class="field">
-            <span class="field-label">知识点（多个用逗号分隔） <button type="button" class="btn small" id="btnAiTag">AI 打标</button></span>
-            <input type="text" id="mKp" placeholder="例如：分数乘法, 约分">
-          </label>
-          <label class="field">
-            <span class="field-label">错误原因</span>
-            <input type="text" id="mReason" placeholder="例如：计算粗心、概念不清">
-          </label>
-          <label class="check-field">
-            <input type="checkbox" id="mWrong" checked>
-            <span>标记为错题</span>
-          </label>
-          <button class="btn primary block" type="submit">保存题目</button>
-        </form>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ============ 视图：错题集 ============ -->
-  <section id="view-bank" class="view">
-    <div class="card">
-      <h2 class="card-title">错题集 <span class="count-badge" id="bankCount">0 题</span></h2>
-      <div class="filter-bar">
-        <select id="fGrade"><option value="">全部年级</option></select>
-        <select id="fTerm"><option value="">全部学期</option></select>
-        <select id="fSubject"><option value="">全部科目</option></select>
-        <select id="fKp"><option value="">全部知识点</option></select>
-        <select id="fMastery"><option value="">全部状态</option></select>
-        <input type="search" id="fKeyword" placeholder="关键词搜索题干 / 答案 / 原因">
-        <button class="btn ghost" id="btnClearFilter" type="button">清空筛选</button>
-      </div>
-    </div>
-    <div id="bankList" class="bank-list"></div>
-    <p id="bankEmpty" class="empty" hidden>暂无符合条件的题目，去「录入题目」添加几道吧。</p>
-  </section>
-
-  <!-- ============ 视图：组卷打印 ============ -->
-  <section id="view-paper" class="view">
-    <div class="card">
-      <h2 class="card-title">组卷打印</h2>
-      <div class="filter-bar">
-        <select id="pGrade"><option value="">全部年级</option></select>
-        <select id="pTerm"><option value="">全部学期</option></select>
-        <select id="pSubject"><option value="">全部科目</option></select>
-        <select id="pKp"><option value="">全部知识点</option></select>
-        <select id="pMastery"><option value="">全部状态</option></select>
-        <label class="check-field inline">
-          <input type="checkbox" id="pOnlyWrong" checked>
-          <span>仅从错题中抽取</span>
-        </label>
-        <label class="count-field">
-          抽题数量
-          <input type="number" id="pCount" min="1" max="100" value="10">
-        </label>
-        <label class="check-field inline">
-          <input type="checkbox" id="pWithAnswers" checked>
-          <span>附答案页</span>
-        </label>
-        <button class="btn primary" id="btnGenPaper" type="button">生成试卷</button>
-        <button class="btn" id="btnPrint" type="button" disabled>打印</button>
-      </div>
-      <p class="hint" id="paperHint">设置筛选条件后点击「生成试卷」，可先在下方预览，再打印。</p>
-    </div>
-    <div id="paperPreview"></div>
-  </section>
-
-  <!-- ============ 视图：知识点分析 ============ -->
-  <section id="view-analysis" class="view">
-    <div class="card">
-      <h2 class="card-title">知识点分析 <span class="count-badge" id="analysisCount">0 个知识点</span></h2>
-      <p class="hint">统计所有「错题」按知识点的出现次数，点击某个知识点可直接针对它抽题组卷。</p>
-    </div>
-    <div id="analysisChart" class="chart card"></div>
-    <p id="analysisEmpty" class="empty" hidden>还没有错题数据，先去录入题目或加载示例数据。</p>
-  </section>
-
-</main>
+<!-- 数据管理（导出/导入/示例）放在侧栏底部弹出菜单 -->
+<div class="data-menu" id="dataMenu" hidden>
+  <button class="btn ghost" id="btnExport" type="button">导出备份（JSON）</button>
+  <button class="btn ghost" id="btnImport" type="button">导入备份</button>
+  <input type="file" id="importFile" accept="application/json,.json" hidden>
+  <button class="btn ghost" id="btnSample" type="button">加载示例数据</button>
+</div>
 
 <!-- 打印区域：打印时仅显示此区域 -->
 <div id="print-area"></div>
@@ -187,30 +295,42 @@
   </div>
 </div>
 
-<!-- 后端不可达引导页 -->
-<div id="fatalError" class="modal-overlay" hidden>
-  <div class="modal">
-    <div class="modal-head"><h3>无法连接本地服务</h3></div>
-    <div class="modal-body">
-      <p>错题集现在使用本地数据库存储数据，需要本地服务在运行（不再支持直接双击 index.html）。</p>
-      <ul>
-        <li><b>桌面版</b>：直接双击应用图标（自动启动服务并打开浏览器）。</li>
-        <li><b>源码模式</b>：在项目根目录执行
-          <code>python launcher.py</code> 或 <code>uvicorn server.main:app --port 8000</code>，
-          然后刷新本页面。</li>
-      </ul>
-      <p class="hint">数据文件位于用户目录 <code>~/.cuotiji/cuotiji.db</code>。</p>
-    </div>
-  </div>
-</div>
-
 <!-- AI 加载态 -->
 <div id="loading" class="loading-overlay" hidden>
   <div class="spinner"></div>
   <span id="loadingText">AI 处理中…</span>
 </div>
 
+<!-- 首次引导浮层（3 步，可跳过） -->
+<div id="onboard" class="onboard" hidden>
+  <div class="onboard-card">
+    <h3 id="obTitle"></h3>
+    <p id="obDesc"></p>
+    <div class="onboard-dots" id="obDots"></div>
+    <div class="onboard-btns">
+      <button class="btn ghost" id="obSkip" type="button">跳过</button>
+      <button class="btn primary" id="obNext" type="button">下一步</button>
+    </div>
+  </div>
+</div>
+
+<!-- 后端不可达引导页 -->
+<div id="fatalError" class="modal-overlay" hidden>
+  <div class="modal">
+    <div class="modal-head"><h3>连不上本地服务</h3></div>
+    <div class="modal-body">
+      <p>题目保存在这台电脑里，需要应用内的本地服务在运行（不能直接双击打开网页文件）。</p>
+      <ul>
+        <li><b>桌面版</b>：直接双击应用图标。</li>
+        <li><b>开发者</b>：在项目根目录执行 <code>python launcher.py</code> 或 <code>uvicorn server.main:app --port 8000</code> 后刷新。</li>
+      </ul>
+      <p class="hint">数据文件在这台电脑的 <code>~/.cuotiji/cuotiji.db</code>；备份方式见设置里的「导出备份」。</p>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="js/texts.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/pdfimport.js"></script>
 <script src="js/app.js"></script>

@@ -27,6 +27,8 @@ pub const MOCK_OCR_TEXT: &str = "1. 计算下列各题：(1) 3/4 × 8/9 = （2�
 3. 已知长方形的长是 8 厘米，宽是 5 厘米，求它的周长和面积。";
 
 // 与 server/prompts.py 模板逐字一致（Python {{ }} 转义已展开为字面 { }）
+// K12 学段沿用此模板（与 Python 版逐字对拍保持一致）；
+// 大学/职业考试使用 PROMPT_TAG_UNI / PROMPT_TAG_VOC（一期新增）。
 const PROMPT_TAG: &str = "请为下面这道{grade}{term}学期{subject}题标注知识点。
 
 要求：
@@ -34,6 +36,40 @@ const PROMPT_TAG: &str = "请为下面这道{grade}{term}学期{subject}题标�
 2. 目录确实没有合适的，可以补充自定义知识点，必须将 custom 置为 true；
 3. 目录内的知识点 custom 置为 false；
 4. 只输出 JSON，格式：{\"knowledge_points\": [{\"name\": \"知识点名\", \"custom\": false}]}
+
+知识点目录（可选）：
+{catalog}
+
+题目：
+{question}
+";
+
+/// 大学学段：课程×章节，标签粒度=章节知识点；同时判断题型。
+const PROMPT_TAG_UNI: &str = "请为下面这道大学课程《{grade}》的题目标注知识点。
+
+要求：
+1. 优先从给定「课程×章节」知识点目录中挑选最贴切的，最多 5 个，标签粒度为章节知识点；
+2. 目录确实没有合适的，可以补充自定义知识点，必须将 custom 置为 true；
+3. 目录内的知识点 custom 置为 false；
+4. 同时判断该题题型，从「{qtype_vocab}」中选择最合适的一个；
+5. 只输出 JSON，格式：{\"knowledge_points\": [{\"name\": \"知识点名\", \"custom\": false}], \"qtype\": \"题型\"}
+
+知识点目录（可选）：
+{catalog}
+
+题目：
+{question}
+";
+
+/// 职业考试学段：考试项目×科目，标签粒度=考点；同时判断题型。
+const PROMPT_TAG_VOC: &str = "请为下面这道{grade}考试《{subject}》科目的题目标注知识点。
+
+要求：
+1. 优先从给定「考试项目×科目」考点目录中挑选最贴切的，最多 5 个，标签粒度为考点；
+2. 目录确实没有合适的，可以补充自定义知识点，必须将 custom 置为 true；
+3. 目录内的知识点 custom 置为 false；
+4. 同时判断该题题型，从「{qtype_vocab}」中选择最合适的一个；
+5. 只输出 JSON，格式：{\"knowledge_points\": [{\"name\": \"知识点名\", \"custom\": false}], \"qtype\": \"题型\"}
 
 知识点目录（可选）：
 {catalog}
@@ -99,12 +135,28 @@ pub fn build_messages(task: &str, payload: &Map<String, Value>, catalog: &[Strin
             } else {
                 catalog.iter().map(|c| format!("- {}", c)).collect::<Vec<_>>().join("\n")
             };
-            PROMPT_TAG
-                .replace("{grade}", grade)
-                .replace("{term}", term)
-                .replace("{subject}", subject)
-                .replace("{catalog}", &catalog_str)
-                .replace("{question}", s(payload, "question"))
+            let stage = s(payload, "stage");
+            if stage == "大学" {
+                PROMPT_TAG_UNI
+                    .replace("{grade}", grade)
+                    .replace("{qtype_vocab}", &crate::db::qtype_vocab("大学").join("、"))
+                    .replace("{catalog}", &catalog_str)
+                    .replace("{question}", s(payload, "question"))
+            } else if stage == "职业考试" {
+                PROMPT_TAG_VOC
+                    .replace("{grade}", grade)
+                    .replace("{subject}", subject)
+                    .replace("{qtype_vocab}", &crate::db::qtype_vocab("职业考试").join("、"))
+                    .replace("{catalog}", &catalog_str)
+                    .replace("{question}", s(payload, "question"))
+            } else {
+                PROMPT_TAG
+                    .replace("{grade}", grade)
+                    .replace("{term}", term)
+                    .replace("{subject}", subject)
+                    .replace("{catalog}", &catalog_str)
+                    .replace("{question}", s(payload, "question"))
+            }
         }
         "solve" => PROMPT_SOLVE
             .replace("{grade}", grade)
@@ -228,7 +280,18 @@ pub fn parse_tag(content: &str) -> Result<Value, OutputError> {
     if out.is_empty() {
         return Err(OutputError("knowledge_points 中没有合法条目".into()));
     }
-    Ok(json!({"knowledge_points": out}))
+    // qtype（题型）可选：AI 未返回时留空，前端显示「未分类」
+    let qtype = data
+        .get("qtype")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let mut result = json!({"knowledge_points": out});
+    if !qtype.is_empty() {
+        result["qtype"] = json!(qtype);
+    }
+    Ok(result)
 }
 
 pub fn parse_solve(content: &str) -> Result<Value, OutputError> {
@@ -333,11 +396,24 @@ pub fn mock_response(task: &str, payload: &Map<String, Value>) -> Result<Value, 
                 _ => ["基础知识", "综合运用"],
             };
             let label = if subject.is_empty() { "综合" } else { subject };
+            // Mock 题型：沿用切分猜测规则后映射到新词表
+            let raw = guess_type(s(payload, "question"));
+            let qtype = match raw {
+                "选择题" => "选择",
+                "填空题" => "填空",
+                "判断题" => "判断",
+                "计算题" => "计算",
+                "解答题" => "计算证明",
+                "阅读题" => "阅读理解",
+                "写作题" => "作文",
+                "默写题" => "默写",
+                other => other,
+            };
             Ok(json!({"knowledge_points": [
                 {"name": base[0], "custom": false},
                 {"name": base[1], "custom": false},
                 {"name": format!("Mock 补充知识点（{}）", label), "custom": true},
-            ]}))
+            ], "qtype": qtype}))
         }
         "solve" => Ok(json!({
             "answer": "（Mock 答案）42",

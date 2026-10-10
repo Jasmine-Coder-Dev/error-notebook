@@ -1,7 +1,8 @@
-/* 主逻辑：导航、PDF 导入 UI、手动录入、错题集、组卷打印、知识点分析、数据管理 */
+/* 主逻辑：导航、学段联动、PDF 导入、手动录入、错题集、组卷打印、学情分析、数据管理、引导 */
 (function () {
   const CJT = window.CJT;
-  const { GRADES, TERMS, SUBJECTS, MASTERY } = CJT.CONST;
+  const T = CJT.TEXTS;
+  const { GRADES, TERMS, SUBJECTS, MASTERY, STAGES, K12_STAGES, QTYPE_VOCAB, CLASSIFY_SEEDS, hasTerm, stageOfGrade } = CJT.CONST;
   const store = CJT.store;
 
   const $ = (sel, root) => (root || document).querySelector(sel);
@@ -36,7 +37,7 @@
     el.textContent = msg;
     el.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
+    toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
   }
 
   function setStatus(el, msg, type) {
@@ -44,30 +45,79 @@
     el.className = 'status' + (type ? ' ' + type : '');
   }
 
-  /* ---------- 主题（自动 / 浅色 / 深色） ---------- */
-  const THEME_KEY = 'cuotiji_theme';
-  const mq = window.matchMedia('(prefers-color-scheme: dark)');
-  function applyTheme() {
-    const mode = localStorage.getItem(THEME_KEY) || 'auto';
-    const dark = mode === 'dark' || (mode === 'auto' && mq.matches);
-    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-    const label = { auto: '🌗 外观·自动', light: '☀️ 外观·浅色', dark: '🌙 外观·深色' }[mode];
-    const btn = $('#btnTheme');
-    if (btn) btn.textContent = label;
+  /* ---------- 学段状态 ---------- */
+  let curStage = localStorage.getItem('cuotiji_stage') || '小学';
+  if (!STAGES.includes(curStage)) curStage = '小学';
+
+  function saveStage() {
+    localStorage.setItem('cuotiji_stage', curStage);
   }
-  $('#btnTheme').addEventListener('click', () => {
-    const order = ['auto', 'light', 'dark'];
-    const cur = localStorage.getItem(THEME_KEY) || 'auto';
-    localStorage.setItem(THEME_KEY, order[(order.indexOf(cur) + 1) % order.length]);
-    applyTheme();
-  });
-  mq.addEventListener('change', applyTheme);
-  applyTheme();
+
+  function qtypeOptions(stage, current) {
+    const vocab = QTYPE_VOCAB[stage] || QTYPE_VOCAB['其他'];
+    const opts = vocab.slice();
+    if (current && !opts.includes(current)) opts.push(current);
+    return opts;
+  }
+
+  /* ---------- 分类一/二控件（学段联动：K12 下拉，其余自由输入+建议） ---------- */
+  // prefix: 'imp' | 'm'；K12 用 select，大学/职考/其他用 input+datalist
+  function renderClassifyUI(prefix) {
+    const isK12 = K12_STAGES.includes(curStage);
+    const selGrade = $('#' + prefix + 'Grade');
+    const inpGrade = $('#' + prefix + 'GradeInput');
+    const selTerm = $('#' + prefix + 'Term');
+    const lblTerm = $('#lbl' + (prefix === 'imp' ? 'Imp' : 'M') + 'Term');
+    const selSubject = $('#' + prefix + 'Subject');
+    const inpSubject = $('#' + prefix + 'SubjectInput');
+
+    if (isK12) {
+      selGrade.hidden = false; inpGrade.hidden = true;
+      selSubject.hidden = false; inpSubject.hidden = true;
+      lblTerm.style.display = '';
+      fillSelect(selGrade, GRADES, null);
+      fillSelect(selTerm, TERMS, null);
+      fillSelect(selSubject, SUBJECTS, null);
+    } else {
+      selGrade.hidden = true; inpGrade.hidden = false;
+      selSubject.hidden = true; inpSubject.hidden = true;
+      lblTerm.style.display = 'none';
+      // 建议：种子 + 该学段已录题目的输入历史（去重）
+      const pool = store.all().filter(q => q.stage === curStage);
+      const seedGrades = (CLASSIFY_SEEDS[curStage] || []).map(x => x.grade);
+      const gradeSet = [...new Set(seedGrades.concat(pool.map(q => q.grade).filter(Boolean)))];
+      const dlGrade = $('#dl' + (prefix === 'imp' ? 'Grade' : 'Grade2'));
+      dlGrade.innerHTML = gradeSet.map(g => `<option value="${esc(g)}">`).join('');
+      const curGrade = inpGrade.value;
+      const seedSubs = (CLASSIFY_SEEDS[curStage] || []).filter(x => !curGrade || x.grade === curGrade).map(x => x.subject).filter(Boolean);
+      const subSet = [...new Set(seedSubs.concat(pool.filter(q => !curGrade || q.grade === curGrade).map(q => q.subject).filter(Boolean)))];
+      const dlSubject = $('#dl' + (prefix === 'imp' ? 'Subject' : 'Subject2'));
+      dlSubject.innerHTML = subSet.map(s => `<option value="${esc(s)}">`).join('');
+    }
+    // 标签随学段变化
+    const gradeLabel = isK12 ? T.labelGradeK12 : curStage === '大学' ? T.labelGradeUni : curStage === '职业考试' ? T.labelGradeVoc : '分类一';
+    const subjectLabel = isK12 ? T.labelSubjectK12 : curStage === '大学' ? T.labelSubjectUni : T.labelSubjectVoc;
+    const gEl = prefix === 'imp' ? $('#lblImpGrade') : $('#lblMGrade');
+    gEl.childNodes[0].textContent = gradeLabel;
+    const sEl = prefix === 'imp' ? $('#lblImpSubject') : $('#lblMSubject');
+    sEl.childNodes[0].textContent = subjectLabel;
+  }
+
+  // 读取当前分类值
+  function classifyValue(prefix) {
+    const isK12 = K12_STAGES.includes(curStage);
+    return {
+      stage: curStage,
+      grade: isK12 ? $('#' + prefix + 'Grade').value : $('#' + prefix + 'GradeInput').value.trim(),
+      term: isK12 ? $('#' + prefix + 'Term').value : '',
+      subject: isK12 ? $('#' + prefix + 'Subject').value : $('#' + prefix + 'SubjectInput').value.trim()
+    };
+  }
 
   /* ================= AI 通用封装 ================= */
   let aiLoading = 0;
 
-  /** 统一 AI 请求封装：loading 态 + 错误 toast（区分未配置 Key / 网络 / 输出异常 / 后端不可达） */
+  /** 统一 AI 请求封装：loading 态 + 口语化错误提示 */
   async function callAI(path, body, opts) {
     opts = opts || {};
     const loadingEl = $('#loading');
@@ -83,19 +133,18 @@
           body: JSON.stringify(body || {})
         });
       } catch (e) {
-        toast('无法连接后端服务，请在项目根目录运行：uvicorn server.main:app --port 8000');
+        toast(T.errUnreachable);
         return null;
       }
       if (!resp.ok) {
         let info = {};
         try { info = (await resp.json()).detail || {}; } catch (e) { /* 保留默认 */ }
         const type = info.type || 'unknown';
-        const msg = info.message || ('请求失败（HTTP ' + resp.status + '）');
-        if (type === 'config_error') toast('未配置 API Key：请打开「AI 设置」配置，或选择 Mock 厂商');
-        else if (type === 'auth_error') toast('鉴权失败：请检查 API Key 是否正确');
-        else if (type === 'network_error') toast('网络错误：无法连接 AI 厂商接口。' + msg);
-        else if (type === 'output_error') toast('模型输出异常：' + msg);
-        else toast(msg);
+        if (type === 'config_error') toast(T.errNoKey);
+        else if (type === 'auth_error') toast(T.errAuth);
+        else if (type === 'network_error') toast(T.errNetwork);
+        else if (type === 'output_error') toast(T.errOutput);
+        else toast(info.message || '出错了，请重试');
         return null;
       }
       return await resp.json();
@@ -118,6 +167,20 @@
     }
   }
 
+  async function postJSON(path, payload) {
+    try {
+      const resp = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload || {})
+      });
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch (e) {
+      return null;
+    }
+  }
+
   /* ---------- 弹层 ---------- */
   function openModal(title, footHTML) {
     $('#modalTitle').textContent = title;
@@ -134,31 +197,29 @@
   });
 
   /* ---------- AI 设置面板 ---------- */
-  function initAiSettings() {
-    $('#btnAiSettings').addEventListener('click', openAiSettings);
-  }
-
   async function openAiSettings() {
     openModal('AI 设置');
     const body = $('#modalBody');
     body.innerHTML = '<p class="hint">正在加载配置…</p>';
     const [provData, st] = [await fetchJSON('/api/providers'), await fetchJSON('/api/settings')];
     if (!provData || !st) {
-      body.innerHTML = '<p class="status err">无法连接本地服务。桌面版请直接双击应用图标；源码模式请在项目根目录运行 <code>uvicorn server.main:app --port 8000</code> 或 <code>python launcher.py</code> 后重试。</p>';
+      body.innerHTML = '<p class="status err">' + esc(T.errUnreachable) + '</p>';
       return;
     }
     const providers = provData.providers;
     body.innerHTML = `
       <div class="ai-set-form">
         <label class="field">
-          <span class="field-label">厂商</span>
+          <span class="field-label">AI 服务商
+            <span class="hint-tip" data-tip-key="tipAiKey">?</span>
+          </span>
           <select id="aiProvider">
             ${providers.map(p => `<option value="${esc(p.id)}" ${st.provider === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
           </select>
         </label>
         <div class="ai-set-row">
           <label class="field">
-            <span class="field-label">Base URL</span>
+            <span class="field-label">接口地址（一般不用改）</span>
             <input type="text" id="aiBaseUrl" placeholder="OpenAI 兼容接口地址">
           </label>
           <label class="field">
@@ -168,13 +229,13 @@
           </label>
         </div>
         <label class="field">
-          <span class="field-label">API Key（${st.has_key ? '已保存 ' + esc(st.api_key_masked) : '未配置'}）</span>
-          <input type="password" id="aiKey" placeholder="${st.has_key ? '留空则保持不变' : '请输入 API Key'}">
+          <span class="field-label">AI 服务密钥（${st.has_key ? '已保存 ' + esc(st.api_key_masked) : '还没填'}）</span>
+          <input type="password" id="aiKey" placeholder="${st.has_key ? '留空则保持不变' : '从 AI 厂商官网复制'}">
         </label>
         <div class="ai-set-row">
           <button class="btn primary" id="aiSave" type="button">保存设置</button>
           <button class="btn" id="aiTest" type="button">测试连接</button>
-          <span class="hint" style="margin:0">Mock 厂商无需 Key，用于离线联调。</span>
+          <span class="hint" style="margin:0">选「Mock（离线体验）」无需密钥，可先体验全部功能。</span>
         </div>
         <div id="aiTestResult"></div>
       </div>
@@ -193,7 +254,6 @@
       modelList.innerHTML = (p.models || []).map(m => `<option value="${esc(m)}">`).join('');
       baseUrlInput.disabled = p.id !== 'custom';
     }
-    // 初始回填当前配置
     baseUrlInput.value = st.base_url || '';
     modelInput.value = st.model || '';
     applyProviderDefaults(true);
@@ -207,57 +267,104 @@
         api_key: $('#aiKey').value
       };
       const saved = await postJSON('/api/settings', payload);
-      if (!saved) { toast('保存失败：无法连接后端'); return; }
-      toast('AI 设置已保存');
-      openAiSettings(); // 重新渲染，刷新打码 Key
+      if (!saved) { toast('保存失败，请重试'); return; }
+      toast('设置已保存');
+      openAiSettings();
     });
 
     $('#aiTest').addEventListener('click', async () => {
       const box = $('#aiTestResult');
-      box.innerHTML = '<p class="hint">测试中…</p>';
+      box.innerHTML = '<p class="hint">正在测试…</p>';
       const res = await callAI('/ai/test', {});
       if (res && res.ok) {
         box.innerHTML = `<p class="ai-test-result ok">连接成功：${esc(res.reply || '')}</p>`;
       } else {
-        box.innerHTML = '<p class="ai-test-result err">连接失败，请根据上方提示检查配置。</p>';
+        box.innerHTML = '<p class="ai-test-result err">连接失败，请检查密钥或换个服务商。</p>';
       }
     });
   }
 
-  async function postJSON(path, payload) {
-    try {
-      const resp = await fetch(path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload || {})
-      });
-      if (!resp.ok) return null;
-      return await resp.json();
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /* ---------- Tab 导航 ---------- */
+  /* ================= 导航 / 主题 / 数据菜单 ================= */
   function switchView(name) {
-    $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === name));
+    $$('.side-item[data-view]').forEach(t => t.classList.toggle('active', t.dataset.view === name));
     $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
     if (name === 'bank') renderBank();
     if (name === 'analysis') renderAnalysis();
   }
-  $('#tabs').addEventListener('click', e => {
-    const btn = e.target.closest('.tab');
+  $('#sideNav').addEventListener('click', e => {
+    const btn = e.target.closest('.side-item');
     if (btn) switchView(btn.dataset.view);
   });
+  $('#btnAiSettings').addEventListener('click', openAiSettings);
 
-  /* ---------- 通用筛选 ---------- */
+  // 侧栏折叠
+  function setCollapsed(c) {
+    $('#sidebar').classList.toggle('collapsed', c);
+    localStorage.setItem('cuotiji_collapsed', c ? '1' : '');
+  }
+  $('#btnCollapse').addEventListener('click', () => {
+    setCollapsed(!$('#sidebar').classList.contains('collapsed'));
+  });
+
+  // 主题（浅色/深色）
+  function applyTheme() {
+    const dark = localStorage.getItem('cuotiji_theme') === 'dark';
+    document.documentElement.dataset.theme = dark ? 'dark' : '';
+  }
+  $('#btnTheme').addEventListener('click', () => {
+    const dark = localStorage.getItem('cuotiji_theme') === 'dark';
+    localStorage.setItem('cuotiji_theme', dark ? '' : 'dark');
+    applyTheme();
+  });
+
+  // 数据菜单
+  $('#btnDataMenu').addEventListener('click', e => {
+    e.stopPropagation();
+    $('#dataMenu').hidden = !$('#dataMenu').hidden;
+  });
+  document.addEventListener('click', e => {
+    if (!$('#dataMenu').hidden && !e.target.closest('#dataMenu') && !e.target.closest('#btnDataMenu')) {
+      $('#dataMenu').hidden = true;
+    }
+  });
+
+  /* ================= 首次引导（3 步，可跳过） ================= */
+  function initOnboard() {
+    if (localStorage.getItem('cuotiji_onboarded')) return;
+    const steps = T.onboard;
+    let idx = 0;
+    const overlay = $('#onboard');
+    function render() {
+      $('#obTitle').textContent = steps[idx].title;
+      $('#obDesc').textContent = steps[idx].desc;
+      $('#obDots').innerHTML = steps.map((_, i) => `<i class="${i === idx ? 'on' : ''}"></i>`).join('');
+      $('#obNext').textContent = idx === steps.length - 1 ? T.onboardDone : T.onboardNext;
+    }
+    $('#obSkip').textContent = T.onboardSkip;
+    render();
+    overlay.hidden = false;
+    $('#obSkip').addEventListener('click', done);
+    $('#obNext').addEventListener('click', () => {
+      if (idx >= steps.length - 1) { done(); return; }
+      idx++;
+      render();
+    });
+    function done() {
+      localStorage.setItem('cuotiji_onboarded', '1');
+      overlay.hidden = true;
+    }
+  }
+
+  /* ================= 通用筛选 ================= */
   function filterQuestions(source, f) {
     const kw = (f.keyword || '').trim().toLowerCase();
     return source.filter(q => {
+      if (f.stage && q.stage !== f.stage) return false;
       if (f.grade && q.grade !== f.grade) return false;
       if (f.term && q.term !== f.term) return false;
       if (f.subject && q.subject !== f.subject) return false;
       if (f.kp && !(q.knowledgePoints || []).includes(f.kp)) return false;
+      if (f.qtype && (q.qtype || '') !== f.qtype) return false;
       if (f.mastery && q.mastery !== f.mastery) return false;
       if (f.onlyWrong && !q.isWrong) return false;
       if (kw) {
@@ -266,6 +373,28 @@
       }
       return true;
     });
+  }
+
+  /* ================= 录入页：学段与步骤条 ================= */
+  function renderStageChips() {
+    $('#stageChips').innerHTML = STAGES.map(s =>
+      `<button type="button" class="stage-chip ${s === curStage ? 'active' : ''}" data-stage="${esc(s)}">${esc(s)}</button>`
+    ).join('');
+    const hints = {
+      '小学': '按「年级 + 学期 + 科目」整理',
+      '初中': '按「年级 + 学期 + 科目」整理',
+      '高中': '按「年级 + 学期 + 科目」整理',
+      '大学': '按「课程 + 章节」整理，无学期',
+      '职业考试': '按「考试项目 + 科目」整理，无学期',
+      '其他': '自由填写分类'
+    };
+    $('#stageHint').textContent = hints[curStage] || '';
+  }
+
+  function updateSteps() {
+    const hasItems = pdfItems.length > 0 || $('#mText').value.trim().length > 0;
+    const steps = $$('#importSteps .step');
+    steps.forEach((s, i) => s.classList.toggle('current', i === (hasItems ? 2 : 1)));
   }
 
   /* ================= PDF 导入 ================= */
@@ -301,79 +430,34 @@
 
   async function handlePdf(file) {
     const status = $('#pdfStatus');
-    const name = file.name.toLowerCase();
-    setStatus(status, '正在解析文件，请稍候……');
+    if (!/\.pdf$/i.test(file.name)) {
+      setStatus(status, '请选 PDF 文件', 'err');
+      return;
+    }
+    setStatus(status, '正在读试卷，请稍等……');
     pdfItems = [];
     renderPreview();
     try {
-      let text = '';
-      if (/\.pdf$/.test(name)) {
-        text = await CJT.pdf.extractText(file);
-        if (!text) {
-          setStatus(status, '该 PDF 为扫描件，暂不支持文本型以外的 PDF（可截图后按图片上传）', 'err');
-          return;
-        }
-      } else if (/\.docx$/.test(name)) {
-        if (file.size > 20 * 1024 * 1024) {
-          setStatus(status, 'Word 文件请控制在 20MB 以内', 'err');
-          return;
-        }
-        const fd = new FormData();
-        fd.append('file', file);
-        const resp = await fetch('/api/parse/docx', { method: 'POST', body: fd });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        const data = await resp.json();
-        text = data.text || '';
-        if (!text) {
-          setStatus(status, '未能从该 Word 文档提取到文字（可能为空文档或老版 .doc，请另存为 .docx）', 'err');
-          return;
-        }
-      } else if (/\.(png|jpe?g|webp)$/.test(name)) {
-        if (file.size > 10 * 1024 * 1024) {
-          setStatus(status, '图片请控制在 10MB 以内', 'err');
-          return;
-        }
-        setStatus(status, 'AI 识别图片文字中，请稍候……');
-        const dataUrl = await new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result);
-          r.onerror = rej;
-          r.readAsDataURL(file);
-        });
-        const resp = await fetch('/api/ai/ocr', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: dataUrl })
-        });
-        const data = await resp.json().catch(() => ({}));
-        if (!resp.ok) {
-          const msg = (data.detail && data.detail.message) || ('HTTP ' + resp.status);
-          setStatus(status, '图片识别失败：' + msg + '（需在「AI 设置」选择支持视觉的模型）', 'err');
-          return;
-        }
-        text = data.text || '';
-        if (!text) {
-          setStatus(status, 'AI 未识别出文字，请换一张更清晰的图片', 'err');
-          return;
-        }
-      } else {
-        setStatus(status, '支持的格式：PDF、Word(.docx)、图片(png/jpg/webp)', 'err');
+      const text = await CJT.pdf.extractText(file);
+      if (!text) {
+        setStatus(status, '这份 PDF 是扫描图片版，暂时只支持文字版试卷', 'err');
         return;
       }
       const parts = CJT.pdf.splitQuestions(text);
       if (!parts.length) {
-        setStatus(status, '未能按题号识别出题目，请检查文档是否为带题号的练习卷', 'err');
+        setStatus(status, '没找到题号，没能拆成题目。可以先手动添加。', 'err');
         return;
       }
       pdfFileName = file.name;
-      pdfItems = parts.map(p => ({ num: p.num, text: p.text, isWrong: true, kps: '' }));
-      setStatus(status, `解析成功：${file.name}，共识别 ${parts.length} 道题。`, 'ok');
+      pdfItems = parts.map(p => ({ num: p.num, text: p.text, isWrong: true, kps: '', qtype: '' }));
+      setStatus(status, `读好了：${file.name}，共 ${parts.length} 道题。`, 'ok');
       $('#importMeta').hidden = false;
       $('#impCount').textContent = parts.length;
       renderPreview();
+      updateSteps();
     } catch (err) {
       console.error(err);
-      setStatus(status, '解析失败：' + (err && err.message ? err.message : err), 'err');
+      setStatus(status, '读文件出错了，请换个 PDF 试试', 'err');
     }
   }
 
@@ -381,19 +465,23 @@
     const list = $('#previewList');
     $('#impCount').textContent = pdfItems.length;
     $('#importMeta').hidden = pdfItems.length === 0;
+    const qtOpts = [''].concat(qtypeOptions(curStage));
     list.innerHTML = pdfItems.map((it, i) => `
       <div class="preview-item" data-i="${i}">
         <div class="preview-head">
           <span class="preview-num">第 ${esc(it.num)} 题</span>
           <span class="spacer"></span>
+          <select class="pv-qtype" title="题型">
+            ${qtOpts.map(q => `<option value="${esc(q)}" ${(it.qtype || '') === q ? 'selected' : ''}>${q ? esc(q) : '未分类'}</option>`).join('')}
+          </select>
           <label class="check-field" style="font-size:13px">
             <input type="checkbox" class="pv-wrong" ${it.isWrong ? 'checked' : ''}>
-            <span>标记为错题</span>
+            <span>错题</span>
           </label>
           <button type="button" class="btn danger small pv-del">删除</button>
         </div>
         <textarea rows="3" class="pv-text">${esc(it.text)}</textarea>
-        <input type="text" class="pv-kp" style="margin-top:6px" placeholder="知识点（逗号分隔，可点上方「全部 AI 打标」自动填充）" value="${esc(it.kps || '')}">
+        <input type="text" class="pv-kp" style="margin-top:6px" placeholder="知识点（逗号隔开，可点「全部 AI 打标」自动填）" value="${esc(it.kps || '')}">
       </div>
     `).join('');
   }
@@ -405,6 +493,7 @@
     if (e.target.classList.contains('pv-text')) pdfItems[i].text = e.target.value;
     if (e.target.classList.contains('pv-wrong')) pdfItems[i].isWrong = e.target.checked;
     if (e.target.classList.contains('pv-kp')) pdfItems[i].kps = e.target.value;
+    if (e.target.classList.contains('pv-qtype')) pdfItems[i].qtype = e.target.value;
   });
   $('#previewList').addEventListener('click', e => {
     const btn = e.target.closest('.pv-del');
@@ -416,73 +505,84 @@
 
   async function importAll() {
     if (!pdfItems.length) return;
-    const payload = pdfItems.map(it => ({
+    const cls = classifyValue('imp');
+    const payload = pdfItems.map(it => Object.assign({
       text: it.text,
       answer: '',
-      grade: $('#impGrade').value,
-      term: $('#impTerm').value,
-      subject: $('#impSubject').value,
       knowledgePoints: String(it.kps || '').split(/[,，、]/).map(s => s.trim()).filter(Boolean),
       isWrong: it.isWrong,
       wrongReason: '',
       mastery: '未掌握',
-      sourceFile: pdfFileName
-    }));
+      sourceFile: pdfFileName,
+      qtype: it.qtype || ''
+    }, cls));
     const n = await store.addMany(payload);
     pdfItems = [];
     pdfFileName = '';
     renderPreview();
-    setStatus($('#pdfStatus'), `已入库 ${n} 道题。`, 'ok');
+    setStatus($('#pdfStatus'), `已存好 ${n} 道题。`, 'ok');
     await refreshAll();
-    toast(`成功导入 ${n} 道题`);
+    toast(`成功存入 ${n} 道题`);
   }
 
   /* ---------- AI 校对切分 / 批量打标 ---------- */
   async function aiSplitCheck() {
     if (!pdfItems.length) {
-      toast('请先上传并解析 PDF');
+      toast('请先上传试卷');
       return;
     }
+    const cls = classifyValue('imp');
     const res = await callAI('/ai/split-check', {
       items: pdfItems.map(it => ({ text: it.text })),
-      grade: $('#impGrade').value,
-      term: $('#impTerm').value,
-      subject: $('#impSubject').value
+      stage: cls.stage, grade: cls.grade, term: cls.term, subject: cls.subject
     });
     if (!res) return;
     pdfItems = res.items.map((it, i) => ({
       num: i + 1,
       text: it.text,
       isWrong: pdfItems[i] ? pdfItems[i].isWrong : true,
-      kps: pdfItems[i] ? pdfItems[i].kps : ''
+      kps: pdfItems[i] ? pdfItems[i].kps : '',
+      qtype: mapSplitQtype(it.type)
     }));
     renderPreview();
-    toast(`AI 校对完成：共 ${res.items.length} 道题（每题已标注题型）`);
+    toast(`校对完成：共 ${res.items.length} 道题（已标题型）`);
+  }
+
+  // 切分校对返回的题型（带「题」后缀）映射到当前学段词表
+  function mapSplitQtype(raw) {
+    if (!raw || raw === '其他') return '';
+    const vocab = QTYPE_VOCAB[curStage] || [];
+    const stripped = raw.replace(/题$/, '');
+    if (vocab.includes(raw)) return raw;
+    if (vocab.includes(stripped)) return stripped;
+    if (raw === '解答题' && vocab.includes('计算证明')) return '计算证明';
+    if (raw === '阅读题' && vocab.includes('阅读理解')) return '阅读理解';
+    if (raw === '写作题' && vocab.includes('作文')) return '作文';
+    return '';
   }
 
   async function aiTagAll() {
     if (!pdfItems.length) {
-      toast('请先上传并解析 PDF');
+      toast('请先上传试卷');
       return;
     }
-    const grade = $('#impGrade').value;
-    const term = $('#impTerm').value;
-    const subject = $('#impSubject').value;
+    const cls = classifyValue('imp');
     let done = 0;
     for (let i = 0; i < pdfItems.length; i++) {
-      const res = await callAI('/ai/tag', {
-        question: pdfItems[i].text, grade, term, subject
-      }, { loadingText: `AI 打标中（${i + 1}/${pdfItems.length}）` });
+      const res = await callAI('/ai/tag', Object.assign({
+        question: pdfItems[i].text
+      }, cls), { loadingText: `AI 打标中（${i + 1}/${pdfItems.length}）` });
       if (!res) {
-        toast(`打标中断：第 ${i + 1} 题请求失败，已完成 ${done} 道`);
+        toast(`打标中断：第 ${i + 1} 道没成功，已完成 ${done} 道`);
         renderPreview();
         return;
       }
       pdfItems[i].kps = (res.knowledge_points || []).map(k => k.name).join('，');
+      if (res.qtype) pdfItems[i].qtype = res.qtype;
       done++;
     }
     renderPreview();
-    toast(`已为 ${done} 道题完成 AI 打标，可在预览中修改`);
+    toast(`已为 ${done} 道题打好标签，可再修改`);
   }
 
   /* ================= 手动录入 ================= */
@@ -491,69 +591,66 @@
       e.preventDefault();
       const text = $('#mText').value.trim();
       if (!text) {
-        toast('请填写题干');
+        toast('请把题目填进来');
         return;
       }
-      await store.add({
+      const cls = classifyValue('m');
+      await store.add(Object.assign({
         text,
         answer: $('#mAnswer').value.trim(),
-        grade: $('#mGrade').value,
-        term: $('#mTerm').value,
-        subject: $('#mSubject').value,
         knowledgePoints: $('#mKp').value.split(/[,，、]/).map(s => s.trim()).filter(Boolean),
         isWrong: $('#mWrong').checked,
         wrongReason: $('#mReason').value.trim(),
         mastery: '未掌握',
-        sourceFile: '手动录入'
-      });
+        sourceFile: '手动录入',
+        qtype: $('#mQtype').value
+      }, cls));
       e.target.reset();
       $('#mWrong').checked = true;
       await refreshAll();
-      toast('已保存题目');
+      updateSteps();
+      toast('已保存');
     });
+
+    $('#mText').addEventListener('input', updateSteps);
 
     $('#btnAiTag').addEventListener('click', async () => {
       const text = $('#mText').value.trim();
       if (!text) {
-        toast('请先填写题干再打标');
+        toast('请先填题目再打标');
         return;
       }
-      const res = await callAI('/ai/tag', {
-        question: text,
-        grade: $('#mGrade').value,
-        term: $('#mTerm').value,
-        subject: $('#mSubject').value
-      });
+      const res = await callAI('/ai/tag', Object.assign({ question: text }, classifyValue('m')));
       if (!res) return;
       const names = (res.knowledge_points || []).map(k => k.name);
       $('#mKp').value = names.join('，');
-      toast(`AI 打标完成：${names.join('、')}`);
+      if (res.qtype && qtypeOptions(curStage).includes(res.qtype)) $('#mQtype').value = res.qtype;
+      toast(`打好标签：${names.join('、')}`);
     });
 
     $('#btnAiSolve').addEventListener('click', async () => {
       const text = $('#mText').value.trim();
       if (!text) {
-        toast('请先填写题干再生成解答');
+        toast('请先填题目');
         return;
       }
-      const res = await callAI('/ai/solve', {
-        question: text,
-        grade: $('#mGrade').value,
-        term: $('#mTerm').value,
-        subject: $('#mSubject').value
-      });
+      const res = await callAI('/ai/solve', Object.assign({ question: text }, classifyValue('m')));
       if (!res) return;
-      $('#mAnswer').value = res.answer + (res.explanation ? '\n解析：' + res.explanation : '');
-      toast('已生成答案与解析，可修改后保存');
+      $('#mAnswer').value = res.answer + (res.explanation ? '\n讲解：' + res.explanation : '');
+      toast('已生成答案，可修改后保存');
     });
   }
 
   /* ================= 错题集 ================= */
+  let drillUncat = false; // 「未分类」下钻标志：任一筛选变化即解除
+
   function bankFilters() {
     return {
+      stage: $('#fStage').value,
       grade: $('#fGrade').value,
       term: $('#fTerm').value,
       subject: $('#fSubject').value,
+      qtype: $('#fQtype').value,
       kp: $('#fKp').value,
       mastery: $('#fMastery').value,
       keyword: $('#fKeyword').value
@@ -561,61 +658,87 @@
   }
 
   function renderBank() {
-    const list = filterQuestions(store.all(), bankFilters());
-    $('#bankCount').textContent = `${list.length} 题`;
-    $('#bankEmpty').hidden = list.length > 0;
+    let list;
+    if (drillUncat) {
+      list = filterQuestions(store.all(), Object.assign(anaFilters(), { qtype: '' }))
+        .filter(q => q.isWrong && !q.qtype);
+      $('#bankCount').textContent = `${list.length} 题（题型未分类）`;
+    } else {
+      list = filterQuestions(store.all(), bankFilters());
+      $('#bankCount').textContent = `${list.length} 题`;
+    }
+    const empty = $('#bankEmpty');
+    empty.hidden = list.length > 0;
+    empty.querySelector('.empty-text').textContent = store.all().length
+      ? '没有符合筛选条件的题目，换个筛选试试。'
+      : T.emptyBank;
     $('#bankList').innerHTML = list.map(q => `
       <div class="q-card" data-id="${esc(q.id)}">
-        <div class="q-head">
-          <div class="q-badges">
-            <span class="badge">${esc(q.subject)}</span>
-            <span class="badge">${esc(q.grade)}（${esc(q.term)}）</span>
-            ${q.isWrong ? '<span class="badge wrong">错题</span>' : '<span class="badge normal">普通题目</span>'}
-            ${q.wrongReason ? `<span class="reason-tag">原因：${esc(q.wrongReason)}</span>` : ''}
-          </div>
+        <div class="q-badges">
+          <span class="badge">${esc(q.stage || stageOfGrade(q.grade))}</span>
+          ${q.grade ? `<span class="badge">${esc(q.grade)}</span>` : ''}
+          ${q.term ? `<span class="badge">${esc(q.term)}学期</span>` : ''}
+          ${q.subject ? `<span class="badge">${esc(q.subject)}</span>` : ''}
+          ${q.qtype ? `<span class="badge">${esc(q.qtype)}</span>` : ''}
+          ${q.isWrong ? '<span class="badge wrong">错题</span>' : '<span class="badge normal">普通题</span>'}
+          ${q.wrongReason ? `<span class="reason-tag">原因：${esc(q.wrongReason)}</span>` : ''}
         </div>
         <div class="q-text">${esc(q.text)}</div>
-        ${q.answer ? `<div class="q-answer"><b>答案/解析：</b>${esc(q.answer)}</div>` : ''}
+        ${q.answer ? `<div class="q-answer"><b>答案：</b>${esc(q.answer)}</div>` : ''}
         ${q.knowledgePoints.length ? `<div class="q-kps">${q.knowledgePoints.map(k =>
-          `<span class="kp-chip" data-kp="${esc(k)}" title="点击按该知识点筛选">${esc(k)}</span>`).join('')}</div>` : ''}
+          `<span class="kp-chip" data-kp="${esc(k)}" title="按该知识点筛选">${esc(k)}</span>`).join('')}</div>` : ''}
         <div class="q-foot">
           <span>${q.sourceFile ? '来源：' + esc(q.sourceFile) : ''}</span>
           <span>${fmtDate(q.createdAt)}</span>
           <span class="spacer"></span>
-          <label>掌握状态
+          <label>题型
+            <select class="q-qtype">
+              <option value="">未分类</option>
+              ${qtypeOptions(q.stage || '其他', q.qtype).map(t => `<option value="${esc(t)}" ${q.qtype === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}
+            </select>
+          </label>
+          <label>掌握
+            <span class="hint-tip" data-tip-key="tipMastery">?</span>
             <select class="q-mastery">
               ${MASTERY.map(m => `<option value="${esc(m)}" ${q.mastery === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}
             </select>
           </label>
-          <button type="button" class="btn small q-similar">生成同类题</button>
+          <button type="button" class="btn small q-similar">出同类题</button>
           <button type="button" class="btn danger small q-del">删除</button>
         </div>
       </div>
     `).join('');
   }
 
-  ['fGrade', 'fTerm', 'fSubject', 'fKp', 'fMastery'].forEach(id =>
-    $('#' + id).addEventListener('change', renderBank));
-  $('#fKeyword').addEventListener('input', renderBank);
+  ['fStage', 'fGrade', 'fTerm', 'fSubject', 'fQtype', 'fKp', 'fMastery'].forEach(id =>
+    $('#' + id).addEventListener('change', () => { drillUncat = false; renderBank(); }));
+  $('#fKeyword').addEventListener('input', () => { drillUncat = false; renderBank(); });
   $('#btnClearFilter').addEventListener('click', () => {
-    ['fGrade', 'fTerm', 'fSubject', 'fKp', 'fMastery'].forEach(id => { $('#' + id).value = ''; });
+    drillUncat = false;
+    ['fStage', 'fGrade', 'fTerm', 'fSubject', 'fQtype', 'fKp', 'fMastery'].forEach(id => { $('#' + id).value = ''; });
     $('#fKeyword').value = '';
     renderBank();
   });
+  $('#btnGoImport').addEventListener('click', () => switchView('import'));
 
   $('#bankList').addEventListener('change', async e => {
-    const sel = e.target.closest('.q-mastery');
-    if (!sel) return;
-    const id = sel.closest('.q-card').dataset.id;
-    await store.update(id, { mastery: sel.value });
-    toast('掌握状态已更新');
+    const card = e.target.closest('.q-card');
+    if (!card) return;
+    const id = card.dataset.id;
+    if (e.target.classList.contains('q-mastery')) {
+      await store.update(id, { mastery: e.target.value });
+      toast('掌握状态已更新');
+    }
+    if (e.target.classList.contains('q-qtype')) {
+      await store.update(id, { qtype: e.target.value });
+      toast('题型已更新');
+    }
   });
   $('#bankList').addEventListener('click', async e => {
     const del = e.target.closest('.q-del');
     if (del) {
-      const id = del.closest('.q-card').dataset.id;
-      if (confirm('确定删除这道题吗？')) {
-        await store.remove(id);
+      if (confirm(T.confirmDeleteOne)) {
+        await store.remove(del.closest('.q-card').dataset.id);
         renderBank();
         renderAnalysis();
         refreshKpSelects();
@@ -625,17 +748,16 @@
     }
     const sim = e.target.closest('.q-similar');
     if (sim) {
-      const id = sim.closest('.q-card').dataset.id;
-      const q = store.get(id);
+      const q = store.get(sim.closest('.q-card').dataset.id);
       if (!q) return;
-      showSimilarModal('生成同类题', {
+      showSimilarModal('出同类题', {
         question: q.text,
         knowledge_points: q.knowledgePoints,
         count: 3,
-        grade: q.grade, term: q.term, subject: q.subject
+        stage: q.stage, grade: q.grade, term: q.term, subject: q.subject
       }, {
-        grade: q.grade, term: q.term, subject: q.subject,
-        knowledgePoints: q.knowledgePoints
+        stage: q.stage, grade: q.grade, term: q.term, subject: q.subject,
+        knowledgePoints: q.knowledgePoints, qtype: q.qtype
       }, { printable: false });
       return;
     }
@@ -646,7 +768,7 @@
     }
   });
 
-  /* ---------- 同类题弹层（错题集「生成同类题」/ 知识点分析「AI 出题」共用） ---------- */
+  /* ---------- 同类题弹层（错题集「出同类题」/ 学情分析「AI 出题」共用） ---------- */
   async function showSimilarModal(title, request, inherit, opts) {
     opts = opts || {};
     openModal(title, `
@@ -655,16 +777,16 @@
       <button class="btn primary" id="mAddSel" type="button">加入题库</button>
     `);
     const body = $('#modalBody');
-    body.innerHTML = '<p class="hint">AI 生成中…（Mock 厂商将返回模拟数据）</p>';
+    body.innerHTML = '<p class="hint">AI 出题中…</p>';
     const res = await callAI('/ai/similar', request);
     if (!res) {
-      body.innerHTML = '<p class="status err">生成失败，请打开「AI 设置」检查厂商配置，或切换 Mock 厂商。</p>';
+      body.innerHTML = '<p class="status err">没生成成功，请打开「AI 设置」检查，或先选 Mock 体验。</p>';
       $('#mAddSel').hidden = true;
       return;
     }
     const qs = res.questions || [];
     if (!qs.length) {
-      body.innerHTML = '<p class="hint">未生成题目，请重试。</p>';
+      body.innerHTML = '<p class="hint">没出成题，请重试。</p>';
       $('#mAddSel').hidden = true;
       return;
     }
@@ -693,7 +815,7 @@
         isWrong: false,
         mastery: '未掌握',
         wrongReason: '',
-        sourceFile: 'AI 生成同类题'
+        sourceFile: 'AI 出题'
       }, inherit)));
       await refreshAll();
       closeModal();
@@ -703,7 +825,7 @@
       $('#mPrintSel').addEventListener('click', () => {
         const sel = selected();
         if (!sel.length) {
-          toast('请勾选要打印的题目');
+          toast('请勾选题目');
           return;
         }
         const html = buildPaperHTML(sel.map(s => ({
@@ -720,6 +842,7 @@
   /* ================= 组卷打印 ================= */
   function paperFilters() {
     return {
+      stage: $('#pStage').value,
       grade: $('#pGrade').value,
       term: $('#pTerm').value,
       subject: $('#pSubject').value,
@@ -739,7 +862,6 @@
   }
 
   function buildPaperHTML(list, withAnswers) {
-    const title = '错题练习卷';
     const questions = list.map((q, i) => `
       <div class="paper-q">
         <div class="pq-text"><b>${i + 1}.</b> ${esc(q.text)}</div>
@@ -748,7 +870,7 @@
     `).join('');
     const answers = withAnswers
       ? `<div class="answer-page">
-           <h2>参考答案与解析</h2>
+           <h2>参考答案与讲解</h2>
            ${list.map((q, i) => `
              <div class="answer-item">
                <b>${i + 1}.</b> ${esc(q.answer || '（暂无答案）')}
@@ -758,7 +880,7 @@
       : '';
     return `
       <div class="paper-sheet">
-        <h1>${title}</h1>
+        <h1>错题练习卷</h1>
         <div class="paper-meta">
           <span>姓名<span class="paper-line"></span></span>
           <span>日期<span class="paper-line"></span></span>
@@ -785,7 +907,7 @@
     $('#paperPreview').innerHTML = html;
     $('#print-area').innerHTML = html;
     $('#btnPrint').disabled = false;
-    $('#paperHint').textContent = `已从 ${pool.length} 道候选题中抽取 ${picked.length} 道${withAnswers ? '，附答案页' : ''}。点击「打印」输出试卷。`;
+    $('#paperHint').textContent = `从 ${pool.length} 道候选题里抽了 ${picked.length} 道${withAnswers ? '，附答案页' : ''}。点「打印」输出试卷。`;
     return true;
   }
 
@@ -797,62 +919,209 @@
     window.print();
   });
 
-  /* ================= 知识点分析 ================= */
+  /* ================= 学情分析 ================= */
+  let anaTab = 'qtype';
+  let chartMode = 'bar'; // bar | pie
+
+  function anaFilters() {
+    return {
+      stage: $('#aStage').value,
+      grade: $('#aGrade').value,
+      subject: $('#aSubject').value,
+      onlyWrong: true
+    };
+  }
+
+  function analysisPool() {
+    return filterQuestions(store.all(), anaFilters()).filter(q => q.isWrong);
+  }
+
   function renderAnalysis() {
-    const wrong = store.all().filter(q => q.isWrong);
+    const pool = analysisPool();
+    $('#analysisEmpty').hidden = pool.length > 0;
+    $('#analysisEmpty .empty-text').textContent = T.emptyAnalysis;
+
+    // 摘要卡片
+    $('#sumTotal').textContent = pool.length;
+    const qCounts = new Map();
+    const kpCounts = new Map();
+    pool.forEach(q => {
+      const qt = q.qtype || '未分类';
+      qCounts.set(qt, (qCounts.get(qt) || 0) + 1);
+      (q.knowledgePoints || []).forEach(k => kpCounts.set(k, (kpCounts.get(k) || 0) + 1));
+    });
+    const topQt = [...qCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+    const topKp = [...kpCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+    $('#sumQtype').textContent = topQt ? `${topQt[0]}（${topQt[1]} 次）` : '—';
+    $('#sumKp').textContent = topKp ? `${topKp[0]}（${topKp[1]} 次）` : '—';
+
+    $('#anaPanelQtype').hidden = anaTab !== 'qtype';
+    $('#anaPanelKp').hidden = anaTab !== 'kp';
+
+    if (anaTab === 'qtype') renderQtypeChart(pool);
+    else renderKpChart(pool);
+
+    // 历史数据补标入口
+    const missing = pool.filter(q => !q.qtype).length;
+    $('#btnAiQtype').hidden = missing === 0;
+    $('#aiQtypeSub').textContent = missing ? `${missing} 道错题还没有题型，可一键补标` : T.emptyQtype;
+  }
+
+  const PIE_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#64748b'];
+
+  function renderQtypeChart(pool) {
+    const chart = $('#qtypeChart');
     const counts = new Map();
-    wrong.forEach(q => (q.knowledgePoints || []).forEach(k => {
-      counts.set(k, (counts.get(k) || 0) + 1);
-    }));
-    const rows = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
-    $('#analysisCount').textContent = `${counts.size} 个知识点`;
-    const chart = $('#analysisChart');
-    $('#analysisEmpty').hidden = wrong.length > 0;
+    pool.forEach(q => {
+      const qt = q.qtype || '未分类';
+      counts.set(qt, (counts.get(qt) || 0) + 1);
+    });
+    const rows = [...counts.entries()].sort((a, b) => b[1] - a[1]);
     if (!rows.length) {
-      chart.innerHTML = '<p class="chart-empty">暂无错题知识点数据</p>';
+      chart.innerHTML = '<p class="hint">暂无数据</p>';
+      return;
+    }
+    if (chartMode === 'pie') {
+      const total = rows.reduce((s, r) => s + r[1], 0);
+      let acc = 0;
+      const segs = rows.map(([name, n], i) => {
+        const from = acc / total * 360;
+        acc += n;
+        const to = acc / total * 360;
+        const color = name === '未分类' ? '#94a3b8' : PIE_COLORS[i % PIE_COLORS.length];
+        return `${color} ${from}deg ${to}deg`;
+      }).join(', ');
+      chart.innerHTML = `
+        <div class="pie-wrap">
+          <div class="pie" style="background: conic-gradient(${segs})"></div>
+          <div class="pie-legend">
+            ${rows.map(([name, n], i) => `
+              <span class="lg" data-qt="${esc(name)}">
+                <span class="dot" style="background:${name === '未分类' ? '#94a3b8' : PIE_COLORS[i % PIE_COLORS.length]}"></span>
+                ${esc(name)}　${n} 道（${Math.round(n / total * 100)}%）
+              </span>`).join('')}
+          </div>
+        </div>`;
+      $$('#qtypeChart .lg').forEach(el => el.addEventListener('click', () => drillQtype(el.dataset.qt)));
+    } else {
+      const max = rows[0][1];
+      chart.innerHTML = rows.map(([name, n]) => `
+        <div class="chart-row">
+          <span class="chart-label" data-qt="${esc(name)}">${esc(name)}</span>
+          <div class="chart-track"><div class="chart-bar" style="width:${Math.max(4, (n / max) * 100)}%"></div></div>
+          <span class="chart-count">${n} 道</span>
+        </div>
+      `).join('');
+      $$('#qtypeChart .chart-label').forEach(el => el.addEventListener('click', () => drillQtype(el.dataset.qt)));
+    }
+  }
+
+  // 题型下钻：跳到错题集并筛出该题型
+  function drillQtype(qt) {
+    drillUncat = qt === '未分类';
+    ['fStage', 'fGrade', 'fTerm', 'fSubject', 'fKp', 'fMastery'].forEach(id => { $('#' + id).value = ''; });
+    $('#fKeyword').value = '';
+    $('#fQtype').value = drillUncat ? '' : qt;
+    if (drillUncat) {
+      // 沿用分析页筛选范围
+      $('#fStage').value = $('#aStage').value;
+      $('#fGrade').value = $('#aGrade').value;
+      $('#fSubject').value = $('#aSubject').value;
+    }
+    refreshGradeSubjectSelects('f');
+    switchView('bank');
+    renderBank();
+  }
+
+  function renderKpChart(pool) {
+    const chart = $('#kpChart');
+    const countAll = $('#aAllMastery').checked;
+    const counted = pool.filter(q => countAll || q.mastery !== '已掌握');
+    const counts = new Map();
+    const masteryDist = new Map(); // kp -> {未掌握, 复习中, 已掌握}
+    pool.forEach(q => {
+      (q.knowledgePoints || []).forEach(k => {
+        const d = masteryDist.get(k) || { '未掌握': 0, '复习中': 0, '已掌握': 0 };
+        d[q.mastery] = (d[q.mastery] || 0) + 1;
+        masteryDist.set(k, d);
+      });
+    });
+    counted.forEach(q => {
+      (q.knowledgePoints || []).forEach(k => counts.set(k, (counts.get(k) || 0) + 1));
+    });
+    const rows = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (!rows.length) {
+      chart.innerHTML = '<p class="hint">暂无数据</p>';
       return;
     }
     const max = rows[0][1];
-    chart.innerHTML = rows.map(([kp, n], i) => `
-      <div class="chart-row">
-        <span class="chart-label" data-kp="${esc(kp)}" title="点击针对「${esc(kp)}」抽题组卷">${i + 1}. ${esc(kp)}</span>
-        <div class="chart-track"><div class="chart-bar" style="width:${Math.max(4, (n / max) * 100)}%"></div></div>
-        <span style="display:flex;align-items:center;gap:8px">
-          <span class="chart-count">${n} 次</span>
-          <button class="btn small ai-gen" data-kp="${esc(kp)}" type="button">AI 出题</button>
-        </span>
-      </div>
-    `).join('');
+    chart.innerHTML = rows.map(([kp, n], i) => {
+      const d = masteryDist.get(kp) || { '未掌握': 0, '复习中': 0, '已掌握': 0 };
+      const dt = (d['未掌握'] || 0) + (d['复习中'] || 0) + (d['已掌握'] || 0) || 1;
+      return `
+        <div class="chart-row">
+          <span class="chart-label" data-kp="${esc(kp)}" title="点我针对「${esc(kp)}」出题">${i + 1}. ${esc(kp)}</span>
+          <div class="chart-track"><div class="chart-bar" style="width:${Math.max(4, (n / max) * 100)}%"></div></div>
+          <span class="chart-count">
+            ${n} 道
+            <span class="kp-stack" title="未掌握 ${d['未掌握']} / 复习中 ${d['复习中']} / 已掌握 ${d['已掌握']}">
+              <i class="s-red" style="width:${(d['未掌握'] || 0) / dt * 100}%"></i>
+              <i class="s-yellow" style="width:${(d['复习中'] || 0) / dt * 100}%"></i>
+              <i class="s-green" style="width:${(d['已掌握'] || 0) / dt * 100}%"></i>
+            </span>
+          </span>
+        </div>`;
+    }).join('');
+    $$('#kpChart .chart-label').forEach(el => el.addEventListener('click', () => drillKp(el.dataset.kp)));
   }
 
-  $('#analysisChart').addEventListener('click', e => {
-    const gen = e.target.closest('.ai-gen');
-    if (gen) {
-      const kp = gen.dataset.kp;
-      const pool = store.all().filter(q => q.isWrong && (q.knowledgePoints || []).includes(kp));
-      const base = pool[Math.floor(Math.random() * pool.length)];
-      showSimilarModal(`AI 出题：${kp}`, {
-        question: base ? base.text : `请围绕知识点「${kp}」出练习题`,
-        knowledge_points: [kp],
-        count: 5,
-        grade: base ? base.grade : '',
-        term: base ? base.term : '',
-        subject: base ? base.subject : ''
-      }, {
-        grade: base ? base.grade : GRADES[0],
-        term: base ? base.term : '上',
-        subject: base ? base.subject : '数学',
-        knowledgePoints: [kp]
-      }, { printable: true });
-      return;
-    }
-    const label = e.target.closest('.chart-label');
-    if (!label) return;
-    ['pGrade', 'pTerm', 'pSubject', 'pMastery'].forEach(id => { $('#' + id).value = ''; });
+  // 知识点下钻：跳到组卷页针对出题
+  function drillKp(kp) {
+    ['pStage', 'pGrade', 'pTerm', 'pSubject', 'pMastery'].forEach(id => { $('#' + id).value = ''; });
     $('#pOnlyWrong').checked = true;
-    $('#pKp').value = label.dataset.kp;
+    $('#pStage').value = $('#aStage').value;
+    $('#pGrade').value = $('#aGrade').value;
+    $('#pSubject').value = $('#aSubject').value;
+    refreshGradeSubjectSelects('p');
+    $('#pKp').value = kp;
     switchView('paper');
     generatePaper();
+  }
+
+  $('#aAllMastery').addEventListener('change', renderAnalysis);
+  $('#btnChartBar').addEventListener('click', () => { chartMode = 'bar'; $('#btnChartBar').classList.add('active'); $('#btnChartPie').classList.remove('active'); renderAnalysis(); });
+  $('#btnChartPie').addEventListener('click', () => { chartMode = 'pie'; $('#btnChartPie').classList.add('active'); $('#btnChartBar').classList.remove('active'); renderAnalysis(); });
+  $$('.ana-tab').forEach(t => t.addEventListener('click', () => {
+    anaTab = t.dataset.ana;
+    $$('.ana-tab').forEach(x => x.classList.toggle('active', x === t));
+    renderAnalysis();
+  }));
+  ['aStage', 'aGrade', 'aSubject'].forEach(id => $('#' + id).addEventListener('change', renderAnalysis));
+  $('#btnGoImport2').addEventListener('click', () => switchView('import'));
+
+  // AI 批量补标题型（历史数据）
+  $('#btnAiQtype').addEventListener('click', async () => {
+    const targets = analysisPool().filter(q => !q.qtype);
+    if (!targets.length) return;
+    if (!confirm(`将给 ${targets.length} 道错题自动识别题型，会消耗一点点 AI 额度。继续吗？`)) return;
+    let done = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const q = targets[i];
+      const res = await callAI('/ai/tag', {
+        question: q.text, stage: q.stage, grade: q.grade, term: q.term, subject: q.subject
+      }, { loadingText: `补标题型中（${i + 1}/${targets.length}）` });
+      if (!res) {
+        toast(`中断：第 ${i + 1} 道失败，已补 ${done} 道`);
+        break;
+      }
+      if (res.qtype) {
+        await store.update(q.id, { qtype: res.qtype });
+        done++;
+      }
+    }
+    await store.reload();
+    renderAnalysis();
+    toast(`已补标 ${done} 道题的题型`);
   });
 
   /* ================= 数据管理 ================= */
@@ -867,12 +1136,12 @@
     const blob = new Blob([text], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `cuotiji-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `错题集备份-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    toast('已导出 JSON 文件');
+    toast('备份文件已下载');
   });
 
   $('#btnImport').addEventListener('click', () => $('#importFile').click());
@@ -883,6 +1152,7 @@
     const reader = new FileReader();
     reader.onload = async () => {
       try {
+        if (!confirm(T.confirmImport.replace('{n}', store.all().length))) return;
         const n = await store.importJSON(reader.result);
         await refreshAll();
         switchView('bank');
@@ -895,59 +1165,120 @@
   });
 
   $('#btnSample').addEventListener('click', async () => {
-    if (!confirm('加载示例数据将覆盖当前全部题目，确定继续吗？')) return;
+    if (!confirm(T.confirmSample)) return;
     const n = await store.loadSamples();
     await refreshAll();
-    toast(`已加载 ${n} 道示例错题`);
+    toast(`已加载 ${n} 道示例`);
   });
 
   /* ================= 初始化 ================= */
+  // 💡 提示内容从文案表注入
+  function initHints() {
+    $$('.hint-tip').forEach(el => {
+      el.setAttribute('data-tip', T[el.dataset.tipKey] || '');
+    });
+    $('#aiSplitSub').textContent = T.aiSplitSub;
+    $('#aiSolveSub').textContent = T.aiSolveSub;
+    $('#aiTagSub').textContent = T.aiTagSub;
+    $('#aiQtypeSub').textContent = T.aiQtypeSub;
+  }
+
   function refreshKpSelects() {
     const kps = store.knowledgePoints();
     fillSelect('#fKp', kps, '全部知识点');
     fillSelect('#pKp', kps, '全部知识点');
   }
 
+  // 分类一/二筛选下拉：随学段切换选项与占位文案（K12 用固定枚举，其余用已录值）
+  function refreshGradeSubjectSelects(prefix) {
+    const stage = $('#' + prefix + 'Stage').value;
+    const isK12 = K12_STAGES.includes(stage);
+    const pool = store.all().filter(q => !stage || q.stage === stage);
+    const grades = isK12 ? GRADES : [...new Set(pool.map(q => q.grade).filter(Boolean))];
+    const subjects = isK12 ? SUBJECTS : [...new Set(pool.map(q => q.subject).filter(Boolean))];
+    fillSelect('#' + prefix + 'Grade', grades, isK12 ? '全部年级' : '全部' + (stage === '大学' ? '课程' : stage === '职业考试' ? '考试' : '分类一'));
+    fillSelect('#' + prefix + 'Subject', subjects, isK12 ? '全部科目' : '全部' + (stage === '大学' ? '章节' : '科目'));
+    const termSel = $('#' + prefix + 'Term');
+    if (termSel) termSel.closest('label') || termSel;
+    // 学期筛选：仅 K12 显示
+    const termWrap = termSel ? termSel.parentElement : null;
+    if (termWrap && termWrap.tagName === 'LABEL') termWrap.style.display = hasTerm(stage) ? '' : 'none';
+    if (!isK12) termSel && (termSel.value = '');
+  }
+
+  ['f', 'p', 'a'].forEach(prefix => {
+    $('#' + prefix + 'Stage').addEventListener('change', () => {
+      refreshGradeSubjectSelects(prefix);
+      if (prefix === 'f') renderBank();
+      if (prefix === 'a') renderAnalysis();
+    });
+  });
+
   async function refreshAll() {
     await store.reload();
     refreshKpSelects();
+    ['f', 'p', 'a'].forEach(refreshGradeSubjectSelects);
     renderBank();
     renderAnalysis();
   }
 
   CJT.refresh = refreshAll;
 
-  /** 后端不可达时的引导页（现在必须依赖本地服务，不再支持 file:// 双击） */
   function showFatalError() {
-    const overlay = $('#fatalError');
-    $('#app').style.display = 'none';
-    overlay.hidden = false;
+    $('#fatalError').hidden = false;
+    $('.shell').style.display = 'none';
   }
 
   async function init() {
-    // 下拉选项
-    fillSelect('#impGrade', GRADES, null);
+    applyTheme();
+    if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+      setCollapsed(true);
+    } else {
+      setCollapsed(localStorage.getItem('cuotiji_collapsed') === '1');
+    }
+
+    renderStageChips();
     fillSelect('#impTerm', TERMS, null);
     fillSelect('#impSubject', SUBJECTS, null);
-    fillSelect('#mGrade', GRADES, null);
     fillSelect('#mTerm', TERMS, null);
     fillSelect('#mSubject', SUBJECTS, null);
-    fillSelect('#fGrade', GRADES, '全部年级');
+    fillSelect('#fStage', STAGES, '全部学段');
+    fillSelect('#pStage', STAGES, '全部学段');
+    fillSelect('#aStage', STAGES, '全部学段');
+    ['f', 'p', 'a'].forEach(refreshGradeSubjectSelects);
     fillSelect('#fTerm', TERMS, '全部学期');
-    fillSelect('#fSubject', SUBJECTS, '全部科目');
-    fillSelect('#fMastery', MASTERY, '全部状态');
-    fillSelect('#pGrade', GRADES, '全部年级');
     fillSelect('#pTerm', TERMS, '全部学期');
-    fillSelect('#pSubject', SUBJECTS, '全部科目');
+    fillSelect('#fMastery', MASTERY, '全部状态');
     fillSelect('#pMastery', MASTERY, '全部状态');
+    fillSelect('#mQtype', qtypeOptions(curStage), null);
 
+    renderClassifyUI('imp');
+    renderClassifyUI('m');
+
+    initHints();
     initPdfUI();
     initManualForm();
-    initAiSettings();
 
-    // 首启迁移提示
+    // 学段 chips
+    $('#stageChips').addEventListener('click', e => {
+      const chip = e.target.closest('.stage-chip');
+      if (!chip) return;
+      curStage = chip.dataset.stage;
+      saveStage();
+      renderStageChips();
+      renderClassifyUI('imp');
+      renderClassifyUI('m');
+      fillSelect('#mQtype', qtypeOptions(curStage), null);
+      renderPreview();
+    });
+
+    // 大学/职考：分类一变化时刷新分类二建议
+    ['impGradeInput', 'mGradeInput'].forEach(id => {
+      $('#' + id).addEventListener('input', () => renderClassifyUI(id.startsWith('imp') ? 'imp' : 'm'));
+    });
+
     window.addEventListener('cjt:migrated', e => {
-      toast(`已将浏览器数据迁移到本地数据库（${e.detail} 道题）`);
+      toast(`已把浏览器里的旧数据迁到本地数据库（${e.detail} 道题）`);
     });
 
     try {
@@ -956,7 +1287,9 @@
       showFatalError();
       return;
     }
-    refreshAll();
+    await refreshAll();
+    initOnboard();
+    updateSteps();
   }
 
   init();

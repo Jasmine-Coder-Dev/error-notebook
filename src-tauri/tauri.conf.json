@@ -16,7 +16,12 @@
         "minWidth": 900,
         "minHeight": 600,
         "resizable": true,
-        "backgroundColor": "#f4f6fa"
+        "backgroundColor": "#f4f6fa",
+        "windowEffects": {
+          "effects": ["sidebar"],
+          "state": "active",
+          "radius": 12.0
+        }
       }
     ],
     "security": {
