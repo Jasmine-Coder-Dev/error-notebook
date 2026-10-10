@@ -33,40 +33,41 @@ Wrong answers are scattered across exam papers, workbooks and photos. Parents co
 | 📄 PDF paper upload with auto question splitting | ✅ | Understands `1.` `1、` `(1)` `第1题` numbering; editable preview |
 | 📝 Word (.docx) upload | ✅ | Pure-Rust parsing, no Office required |
 | 🖼 Image upload with AI recognition | ✅ | Photo/screenshot → vision model extracts text (vision model required) |
-| ✍️ Manual entry | ✅ | Text / answer / reason / knowledge points |
+| ✍️ Manual entry | ✅ | Text / answer / type / reason / knowledge points / **question images** |
+| 🖼 Question images | ✅ | Attach figures (png/jpg/webp); shown on cards, printed with the paper, embedded in exports |
 | 🤖 AI split-check for whole papers | ✅ | Merges mis-splits, finds missed questions, detects question types |
-| 🎯 Question-type tagging | 🚧 | Planned: per-stage type vocabularies (see the [design doc](docs/受众扩展方案.md)) |
+| 🎯 Question-type tagging | ✅ | Per-stage vocabularies (elementary math drills → CPA comprehensive cases); batch AI back-filling for old data |
+| 🎓 College & professional-exam audiences | ✅ | Stages: K12 / college (course × chapter) / professional exams (CPA, law, teaching, civil service, postgraduate — exam × subject); 55 seed catalogs |
 
 ### Organize & Analyze
 
 | Feature | Status | Notes |
 | --- | :-: | --- |
-| 🗂 Multi-dimensional filters | ✅ | Grade × term × subject × knowledge point × mastery + keyword search |
-| 🤖 AI knowledge-point tagging | ✅ | Constrained to a curated catalog; GLM / DeepSeek / Kimi / MiniMax / Qwen |
+| 🗂 Multi-dimensional filters | ✅ | Stage × category-1 × category-2 × type × knowledge point × mastery + keyword search |
+| 🤖 AI knowledge-point tagging | ✅ | Constrained to curated catalogs, stage-aware strategies; GLM / DeepSeek / Kimi / MiniMax / Qwen |
 | 🤖 AI answer & explanation generation | ✅ | |
 | 🤖 AI similar-question generation | ✅ | Variation practice for weak points |
-| 📊 Weak-point analytics | ✅ | Error count per knowledge point, click to generate a targeted paper |
-| 📈 Question-type statistics | 🚧 | Planned: bar/pie charts with drill-down |
-| 🧠 Mastery-weighted analytics | 🚧 | Planned: accuracy × time decay |
-| 🎓 College & professional-exam audiences | 🚧 | Planned: CPA / law / teaching / civil-service catalogs |
+| 📊 Learning analytics (type + knowledge point) | ✅ | Type bar/pie charts with drill-down, summary cards; knowledge-point bars with mastery stacking |
+| 🧠 Mastery-weighted analytics | ✅ | Counts "not mastered + reviewing" by default, toggleable |
+| 📉 Error trends | ✅ | Weekly/monthly new-error count + correction-rate dual-line chart |
 
 ### Practice & Output
 
 | Feature | Status | Notes |
 | --- | :-: | --- |
-| 🎲 Random paper generation | ✅ | Filter + pick N questions, answer blanks, optional answer page |
-| 🖨 One-click print | ✅ | Native system print pipeline, any printer / export to PDF |
+| 🎲 Paper generation | ✅ | Random or **weakness-first** (weighted by unmastered errors per knowledge point) |
+| 🖨 One-click print | ✅ | Native system print pipeline, any printer / export to PDF; images included |
 | 🌗 Light & dark themes | ✅ | Follows system + manual toggle |
-| ⏰ Spaced repetition | 🚧 | Planned: Anki-style 1/3/7/15-day review |
-| 📝 Mock-exam mode | 🚧 | Planned: timed paper + self grading |
-| 🪟 Native material UI | 🚧 | Planned: macOS Liquid Glass / Windows 11 Mica + sidebar navigation |
+| ⏰ Spaced repetition | ✅ | 1/3/7/15-day auto scheduling; "Today's Review" with badge |
+| 📝 Mock-exam mode | ✅ | Timed answering → self grading against answers; "don't know" auto-scheduled for tomorrow |
+| 🪟 Glass sidebar UI | ✅ | Frosted-glass sidebar (collapsible) + dual themes; system-level window materials on the roadmap |
 
 ### Data
 
 | Feature | Status | Notes |
 | --- | :-: | --- |
-| 💾 Local SQLite storage | ✅ | `~/.cuotiji/cuotiji.db` — copy the file to back up |
-| 📤 JSON import / export | ✅ | Cross-device migration |
+| 💾 Local SQLite storage | ✅ | `~/.cuotiji/cuotiji.db` — copy the file to back up; automatic zero-loss migrations |
+| 📤 JSON import / export | ✅ | Cross-device migration with images embedded |
 | 🔒 No account · no telemetry · no cloud | ✅ | See [PRIVACY.md](PRIVACY.md) |
 
 ## 🚀 Quick Start
@@ -110,9 +111,10 @@ Open **AI Settings** in the app → pick a provider → paste your API key → *
 
 - [x] v0.0.1 — PDF splitting, filtering, paper generation & printing, weak-point analytics, five AI abilities
 - [x] v0.0.2 — Rust backend (70% smaller, millisecond startup), Word/image upload, light/dark themes
-- [ ] **Phase 1** — stage-based classification (college / professional exams), question-type charts, mastery weighting, sidebar + native-material UI
-- [ ] Phase 2 — image-based questions, chapter-weighted papers, error trends
-- [ ] Phase 3 — spaced repetition, mock exams
+- [x] Phase 1 — stage-based classification (college / professional exams), question-type charts, mastery weighting, sidebar UI, onboarding
+- [x] Phase 2 — question images, weakness-first paper generation, error trends
+- [x] Phase 3 — spaced repetition, mock exams
+- [ ] Next — system-level window materials (Liquid Glass / Mica), knowledge graph, SM-2 adaptive intervals
 
 Full design (in Chinese): [docs/受众扩展方案.md](docs/受众扩展方案.md).
 
