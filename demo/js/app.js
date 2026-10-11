@@ -1726,8 +1726,8 @@
   async function init() {
     // 先加载服务端偏好（主题/侧栏折叠/学段/引导标记），再渲染 UI
     await Prefs.load();
-    const savedStage = Prefs.get('stage', '');
-    curStage = STAGES.includes(savedStage) ? savedStage : '';
+    // 学段不持久化：每次启动都从「未选择」开始，用户必须显式点击才算选定（门禁语义）
+    curStage = '';
 
     applyTheme();
     if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
