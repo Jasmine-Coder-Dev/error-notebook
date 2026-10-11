@@ -3,6 +3,7 @@
   const CJT = window.CJT;
   const T = CJT.TEXTS;
   const { GRADES, TERMS, SUBJECTS, MASTERY, STAGES, K12_STAGES, QTYPE_VOCAB, CLASSIFY_SEEDS, hasTerm, stageOfGrade } = CJT.CONST;
+  const { GRADE_SUBJECTS, STAGE_SUBJECTS } = CJT;
   const store = CJT.store;
 
   const $ = (sel, root) => (root || document).querySelector(sel);
@@ -112,10 +113,13 @@
       selGrade.hidden = false; inpGrade.hidden = true;
       selSubject.hidden = false; inpSubject.hidden = true;
       lblTerm.style.display = '';
-      // 年级选项按学段过滤：小学只有 1~6 年级，不会冒出初中高中
+      // 年级选项按学段过滤（小学 1~6 年级 / 初中 初一~初三 / 高中）
       fillSelect(selGrade, gradesForStage(curStage), null);
       fillSelect(selTerm, TERMS, null);
-      fillSelect(selSubject, SUBJECTS, null);
+      // 科目按所选年级联动：显示该年级实际开设的科目；未选年级时显示学段并集
+      const g = selGrade.value;
+      const subjects = g && GRADE_SUBJECTS[g] ? GRADE_SUBJECTS[g] : (STAGE_SUBJECTS[curStage] || SUBJECTS);
+      fillSelect(selSubject, subjects, null);
     } else {
       selGrade.hidden = true; inpGrade.hidden = false;
       selSubject.hidden = true; inpSubject.hidden = true;
@@ -1649,7 +1653,11 @@
     const pool = store.all().filter(q => !stage || q.stage === stage);
     // 年级选项按学段过滤（修复：选小学不再出现初中/高中）
     const grades = isK12 ? gradesForStage(stage) : [...new Set(pool.map(q => q.grade).filter(Boolean))];
-    const subjects = isK12 ? SUBJECTS : [...new Set(pool.map(q => q.subject).filter(Boolean))];
+    // 科目按筛选条件联动：选了具体年级→该年级科目；只选学段→学段并集
+    const g = $('#' + prefix + 'Grade').value;
+    const subjects = isK12
+      ? (g && GRADE_SUBJECTS[g] ? GRADE_SUBJECTS[g] : (STAGE_SUBJECTS[stage] || SUBJECTS))
+      : [...new Set(pool.map(q => q.subject).filter(Boolean))];
     fillSelect('#' + prefix + 'Grade', grades, isK12 ? '全部年级' : '全部' + (stage === '大学' ? '课程' : stage === '职业考试' ? '考试' : '分类一'));
     fillSelect('#' + prefix + 'Subject', subjects, isK12 ? '全部科目' : '全部' + (stage === '大学' ? '章节' : '科目'));
     const termSel = $('#' + prefix + 'Term');
@@ -1735,9 +1743,16 @@
       updateSteps();
     });
 
-    // 大学/职考：分类一变化时刷新分类二建议
+    // 大学/职考：分类一输入时刷新分类二建议；K12：年级变化时刷新科目列表
     ['impGradeInput', 'mGradeInput'].forEach(id => {
       $('#' + id).addEventListener('input', () => renderClassifyUI(id.startsWith('imp') ? 'imp' : 'm'));
+    });
+    ['impGrade', 'mGrade'].forEach(id => {
+      $('#' + id).addEventListener('change', () => renderClassifyUI(id.startsWith('imp') ? 'imp' : 'm'));
+    });
+    // 筛选页：年级变化时刷新科目筛选项
+    ['fGrade', 'pGrade'].forEach(id => {
+      $('#' + id).addEventListener('change', () => refreshGradeSubjectSelects(id[0]));
     });
 
     window.addEventListener('cjt:migrated', e => {

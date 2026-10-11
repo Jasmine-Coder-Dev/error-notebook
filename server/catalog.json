@@ -579,7 +579,7 @@
   },
   {
     "stage": "初中",
-    "grade": "七年级",
+    "grade": "初一",
     "term": "上",
     "subject": "数学",
     "points": [
@@ -597,7 +597,7 @@
   },
   {
     "stage": "初中",
-    "grade": "七年级",
+    "grade": "初一",
     "term": "下",
     "subject": "数学",
     "points": [
@@ -613,7 +613,7 @@
   },
   {
     "stage": "初中",
-    "grade": "八年级",
+    "grade": "初二",
     "term": "上",
     "subject": "数学",
     "points": [
@@ -629,7 +629,7 @@
   },
   {
     "stage": "初中",
-    "grade": "八年级",
+    "grade": "初二",
     "term": "下",
     "subject": "数学",
     "points": [
@@ -644,7 +644,7 @@
   },
   {
     "stage": "初中",
-    "grade": "九年级",
+    "grade": "初三",
     "term": "上",
     "subject": "数学",
     "points": [
@@ -660,7 +660,7 @@
   },
   {
     "stage": "初中",
-    "grade": "九年级",
+    "grade": "初三",
     "term": "下",
     "subject": "数学",
     "points": [

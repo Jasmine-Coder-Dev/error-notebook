@@ -9,7 +9,28 @@ localStorage 仅用于一次性迁移标记：
   const CJT = (window.CJT = window.CJT || {});
 
   const GRADES = ['一年级', '二年级', '三年级', '四年级', '五年级', '六年级',
-    '七年级', '八年级', '九年级', '高一', '高二', '高三'];
+    '初一', '初二', '初三', '高一', '高二', '高三'];
+  // 各年级所学科目（随课标：物理初二起、化学初三起；道德与法治含政治）
+  const GRADE_SUBJECTS = {
+    '一年级': ['语文', '数学', '英语'],
+    '二年级': ['语文', '数学', '英语'],
+    '三年级': ['语文', '数学', '英语', '科学', '道德与法治'],
+    '四年级': ['语文', '数学', '英语', '科学', '道德与法治'],
+    '五年级': ['语文', '数学', '英语', '科学', '道德与法治'],
+    '六年级': ['语文', '数学', '英语', '科学', '道德与法治'],
+    '初一': ['语文', '数学', '英语', '历史', '地理', '生物', '道德与法治'],
+    '初二': ['语文', '数学', '英语', '物理', '历史', '地理', '生物', '道德与法治'],
+    '初三': ['语文', '数学', '英语', '物理', '化学', '历史', '道德与法治'],
+    '高一': ['语文', '数学', '英语', '物理', '化学', '生物', '历史', '地理', '政治'],
+    '高二': ['语文', '数学', '英语', '物理', '化学', '生物', '历史', '地理', '政治'],
+    '高三': ['语文', '数学', '英语', '物理', '化学', '生物', '历史', '地理', '政治']
+  };
+  // 学段内全科目（未选年级时展示并集）
+  const STAGE_SUBJECTS = {
+    '小学': ['语文', '数学', '英语', '科学', '道德与法治'],
+    '初中': ['语文', '数学', '英语', '物理', '化学', '生物', '历史', '地理', '道德与法治'],
+    '高中': ['语文', '数学', '英语', '物理', '化学', '生物', '历史', '地理', '政治']
+  };
   const TERMS = ['上', '下'];
   const SUBJECTS = ['语文', '数学', '英语', '物理', '化学', '生物', '历史', '地理', '政治'];
   const MASTERY = ['未掌握', '复习中', '已掌握'];
@@ -21,7 +42,7 @@ localStorage 仅用于一次性迁移标记：
 
   function stageOfGrade(grade) {
     if (GRADES.indexOf(grade) <= 5 && grade) return '小学';
-    if (['七年级', '八年级', '九年级'].includes(grade)) return '初中';
+    if (['初一', '初二', '初三'].includes(grade)) return '初中';
     if (['高一', '高二', '高三'].includes(grade)) return '高中';
     return '其他';
   }
@@ -112,6 +133,8 @@ localStorage 仅用于一次性迁移标记：
     window.dispatchEvent(new CustomEvent('cjt:migrated', { detail: r.inserted || 0 }));
   }
 
+  CJT.GRADE_SUBJECTS = GRADE_SUBJECTS;
+  CJT.STAGE_SUBJECTS = STAGE_SUBJECTS;
   CJT.CONST = { GRADES, TERMS, SUBJECTS, MASTERY, STAGES, K12_STAGES, QTYPE_VOCAB, CLASSIFY_SEEDS, hasTerm, stageOfGrade };
 
   CJT.store = {
@@ -219,7 +242,7 @@ localStorage 仅用于一次性迁移标记：
     {
       text: '一辆汽车以 60 km/h 的速度行驶 2.5 小时，一共行驶了多少千米？',
       answer: '60 × 2.5 = 150 千米。',
-      grade: '八年级', term: '上', subject: '物理',
+      grade: '初二', term: '上', subject: '物理',
       knowledgePoints: ['速度公式', '匀速直线运动'],
       isWrong: true, wrongReason: '单位换算失误', mastery: '未掌握',
       sourceFile: '示例数据', createdAt: now
@@ -227,7 +250,7 @@ localStorage 仅用于一次性迁移标记：
     {
       text: '写出铁在氧气中燃烧的化学方程式，并注明反应现象。',
       answer: '3Fe + 2O₂ ==点燃== Fe₃O₄；现象：剧烈燃烧、火星四射、生成黑色固体。',
-      grade: '九年级', term: '上', subject: '化学',
+      grade: '初三', term: '上', subject: '化学',
       knowledgePoints: ['化学方程式', '氧气性质'],
       isWrong: true, wrongReason: '条件“点燃”漏写', mastery: '复习中',
       sourceFile: '示例数据', createdAt: now
@@ -235,7 +258,7 @@ localStorage 仅用于一次性迁移标记：
     {
       text: '简述光合作用的主要场所和产物。',
       answer: '场所：叶绿体；产物：有机物（葡萄糖）和氧气。',
-      grade: '七年级', term: '下', subject: '生物',
+      grade: '初一', term: '下', subject: '生物',
       knowledgePoints: ['光合作用'],
       isWrong: true, wrongReason: '把场所答成线粒体', mastery: '未掌握',
       sourceFile: '示例数据', createdAt: now
@@ -243,7 +266,7 @@ localStorage 仅用于一次性迁移标记：
     {
       text: '秦统一六国后，在地方上推行什么制度？这一制度有什么作用？',
       answer: '郡县制。作用：加强中央对地方的直接管辖，巩固统一。',
-      grade: '七年级', term: '上', subject: '历史',
+      grade: '初一', term: '上', subject: '历史',
       knowledgePoints: ['秦朝中央集权', '郡县制'],
       isWrong: true, wrongReason: '郡县制与分封制混淆', mastery: '复习中',
       sourceFile: '示例数据', createdAt: now
@@ -251,7 +274,7 @@ localStorage 仅用于一次性迁移标记：
     {
       text: '解方程：2x - 7 = 15',
       answer: '2x = 22，x = 11。',
-      grade: '七年级', term: '上', subject: '数学',
+      grade: '初一', term: '上', subject: '数学',
       knowledgePoints: ['一元一次方程', '移项'],
       isWrong: true, wrongReason: '移项时符号出错', mastery: '已掌握',
       sourceFile: '示例数据', createdAt: now
@@ -259,7 +282,7 @@ localStorage 仅用于一次性迁移标记：
     {
       text: '默写：海内存知己，__________。（王勃《送杜少府之任蜀州》）',
       answer: '天涯若比邻。',
-      grade: '八年级', term: '下', subject: '语文',
+      grade: '初二', term: '下', subject: '语文',
       knowledgePoints: ['古诗词默写'],
       isWrong: true, wrongReason: '“涯”写成“崖”', mastery: '复习中',
       sourceFile: '示例数据', createdAt: now

@@ -11,7 +11,7 @@ use serde_json::{json, Map, Value};
 
 pub const GRADES: &[&str] = &[
     "一年级", "二年级", "三年级", "四年级", "五年级", "六年级",
-    "七年级", "八年级", "九年级", "高一", "高二", "高三",
+    "初一", "初二", "初三", "高一", "高二", "高三",
 ];
 pub const TERMS: &[&str] = &["上", "下"];
 pub const SUBJECTS: &[&str] = &["语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理", "政治"];
@@ -22,7 +22,7 @@ pub const STAGES: &[&str] = &["小学", "初中", "高中", "大学", "职业考
 pub fn stage_of_grade(grade: &str) -> &'static str {
     match grade {
         "一年级" | "二年级" | "三年级" | "四年级" | "五年级" | "六年级" => "小学",
-        "七年级" | "八年级" | "九年级" => "初中",
+        "初一" | "初二" | "初三" => "初中",
         "高一" | "高二" | "高三" => "高中",
         _ => "其他",
     }
@@ -143,11 +143,16 @@ fn migrate(c: &Connection) -> Result<(), String> {
         c.execute("ALTER TABLE questions ADD COLUMN reps INTEGER NOT NULL DEFAULT 0", [])
             .map_err(|e| e.to_string())?;
     }
+    // 旧叫法迁移：七/八/九年级 → 初一/初二/初三（幂等）
+    for (old, new) in [("七年级", "初一"), ("八年级", "初二"), ("九年级", "初三")] {
+        c.execute("UPDATE questions SET grade = ?1 WHERE grade = ?2", rusqlite::params![new, old])
+            .map_err(|e| e.to_string())?;
+    }
     // 回填：空 stage 按 grade 推断
     c.execute(
         "UPDATE questions SET stage = CASE
             WHEN grade IN ('一年级','二年级','三年级','四年级','五年级','六年级') THEN '小学'
-            WHEN grade IN ('七年级','八年级','九年级') THEN '初中'
+            WHEN grade IN ('初一','初二','初三') THEN '初中'
             WHEN grade IN ('高一','高二','高三') THEN '高中'
             ELSE '其他' END
          WHERE stage = ''",
@@ -496,7 +501,7 @@ mod tests {
         assert_eq!(q["stage"], "小学");
         let q = norm(json!({"text": "t", "grade": "高一"}));
         assert_eq!(q["stage"], "高中");
-        let q = norm(json!({"text": "t", "grade": "七年级"}));
+        let q = norm(json!({"text": "t", "grade": "初一"}));
         assert_eq!(q["stage"], "初中");
         let q = norm(json!({"text": "t", "grade": ""}));
         assert_eq!(q["stage"], "其他");
@@ -538,7 +543,7 @@ mod tests {
     #[test]
     fn stage_of_grade_mapping() {
         assert_eq!(stage_of_grade("六年级"), "小学");
-        assert_eq!(stage_of_grade("九年级"), "初中");
+        assert_eq!(stage_of_grade("初三"), "初中");
         assert_eq!(stage_of_grade("高三"), "高中");
         assert_eq!(stage_of_grade("随便"), "其他");
     }
