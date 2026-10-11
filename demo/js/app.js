@@ -1737,27 +1737,30 @@
     }
 
     renderStageChips();
-    fillSelect('#impTerm', TERMS, null);
-    fillSelect('#impSubject', SUBJECTS, null);
-    fillSelect('#mTerm', TERMS, null);
-    fillSelect('#mSubject', SUBJECTS, null);
-    fillSelect('#fStage', STAGES, '全部学段');
-    fillSelect('#pStage', STAGES, '全部学段');
-    fillSelect('#aStage', STAGES, '全部学段');
-    ['f', 'p', 'a'].forEach(refreshGradeSubjectSelects);
-    fillSelect('#fTerm', TERMS, '全部学期');
-    fillSelect('#pTerm', TERMS, '全部学期');
-    fillSelect('#fMastery', MASTERY, '全部状态');
-    fillSelect('#pMastery', MASTERY, '全部状态');
-    fillSelect('#mQtype', qtypeOptions(curStage), null);
 
-    renderClassifyUI('imp');
-    renderClassifyUI('m');
-    updateImportLock();
+    // 后续每步用 try-catch 隔离：一个组件出错不影响其他渲染（学段 chips 已在上面确保渲染）
+    const safe = (fn) => { try { fn(); } catch (e) { console.error('init 步骤失败：', e); } };
+    safe(() => fillSelect('#impTerm', TERMS, null));
+    safe(() => fillSelect('#impSubject', SUBJECTS, null));
+    safe(() => fillSelect('#mTerm', TERMS, null));
+    safe(() => fillSelect('#mSubject', SUBJECTS, null));
+    safe(() => fillSelect('#fStage', STAGES, '全部学段'));
+    safe(() => fillSelect('#pStage', STAGES, '全部学段'));
+    safe(() => fillSelect('#aStage', STAGES, '全部学段'));
+    safe(() => ['f', 'p', 'a'].forEach(refreshGradeSubjectSelects));
+    safe(() => fillSelect('#fTerm', TERMS, '全部学期'));
+    safe(() => fillSelect('#pTerm', TERMS, '全部学期'));
+    safe(() => fillSelect('#fMastery', MASTERY, '全部状态'));
+    safe(() => fillSelect('#pMastery', MASTERY, '全部状态'));
+    safe(() => fillSelect('#mQtype', qtypeOptions(curStage), null));
 
-    initHints();
-    initPdfUI();
-    initManualForm();
+    safe(() => renderClassifyUI('imp'));
+    safe(() => renderClassifyUI('m'));
+    safe(() => updateImportLock());
+
+    safe(() => initHints());
+    safe(() => initPdfUI());
+    safe(() => initManualForm());
 
     // 学段 chips
     $('#stageChips').addEventListener('click', e => {
