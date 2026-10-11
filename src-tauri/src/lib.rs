@@ -119,11 +119,24 @@ pub fn run() {
                         .parse()
                         .expect("无效的本地服务 URL");
                     let _ = window.navigate(url);
+                    // 单窗口应用：macOS 默认关窗口后应用驻留菜单栏（进程不退出）。
+                    // 本应用为工具类，统一为「关闭窗口即退出全部进程」（内嵌服务线程一并终止）。
+                    window.on_window_event(|event| {
+                        if let tauri::WindowEvent::CloseRequested { .. } = event {
+                            std::process::exit(0);
+                        }
+                    });
                 }
             }
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("failed to build tauri application")
-        .run(|_app, _event| {});
+        .run(|_app, event| {
+            // Cmd+Q 等系统退出路径：确认退出（.run 返回后进程结束，tokio 线程随之终止）
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                api.prevent_exit();
+                std::process::exit(0);
+            }
+        });
 }
