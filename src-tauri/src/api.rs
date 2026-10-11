@@ -200,6 +200,41 @@ async fn review_question(
     }
 }
 
+// ---------------- UI 偏好（服务端持久化：WebView origin 含动态端口，localStorage 无法跨次启动保留） ----------------
+
+fn ui_prefs_path() -> std::path::PathBuf {
+    db::data_dir().join("ui_prefs.json")
+}
+
+async fn get_ui_prefs() -> Json<Value> {
+    let v = std::fs::read_to_string(ui_prefs_path())
+        .ok()
+        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+        .unwrap_or_else(|| json!({}));
+    Json(v)
+}
+
+async fn save_ui_prefs(body: Json<Map<String, Value>>) -> Result<Json<Value>, ApiError> {
+    let path = ui_prefs_path();
+    let mut cur: Map<String, Value> = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+        .and_then(|v| v.as_object().cloned())
+        .unwrap_or_default();
+    for (k, v) in body.0.iter() {
+        cur.insert(k.clone(), v.clone());
+    }
+    std::fs::create_dir_all(db::data_dir()).map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "io_error", e.to_string()))?;
+    std::fs::write(&path, serde_json::to_string_pretty(&cur).unwrap())
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "io_error", e.to_string()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+    Ok(Json(Value::Object(cur)))
+}
+
 // ---------------- 图片题干 ----------------
 
 /// 图片目录。
@@ -547,6 +582,7 @@ pub fn router(catalog: Vec<Value>) -> Router {
         .route("/api/upload/image", post(upload_image))
         .route("/images/{name}", get(serve_image))
         .route("/api/review/{id}", post(review_question))
+        .route("/api/ui_prefs", get(get_ui_prefs).post(save_ui_prefs))
         .fallback(crate::server::static_handler)
         .with_state(state)
 }

@@ -55,26 +55,29 @@
         </div>
 
         <div class="grid-2">
-          <div class="card">
-            <h2 class="card-title">上传试卷（PDF）</h2>
+          <div class="card" data-step-gate>
+            <h2 class="card-title">上传试卷（PDF / Word / 图片）</h2>
             <div id="dropZone" class="drop-zone">
-              <p class="drop-text">把 PDF 试卷拖到这里</p>
-              <p class="drop-sub">或 <span class="link">点击选择文件</span></p>
-              <input type="file" id="pdfFile" accept="application/pdf" hidden>
+              <p class="drop-text">把试卷文件拖到这里</p>
+              <p class="drop-sub">支持 PDF / Word / 图片，或 <span class="link">点击选择文件</span></p>
+              <input type="file" id="pdfFile" accept=".pdf,.docx,.png,.jpg,.jpeg,.webp" hidden>
             </div>
             <p id="pdfStatus" class="status"></p>
 
             <div id="importMeta" class="import-meta" hidden>
               <div class="meta-row">
-                <label id="lblImpGrade">年级
+                <label class="field meta-field">
+                  <span class="field-label" id="impGradeLabel">年级</span>
                   <select id="impGrade"></select>
                   <input type="text" id="impGradeInput" class="classify-input" list="dlGrade" placeholder="输入或选择" hidden>
                   <datalist id="dlGrade"></datalist>
                 </label>
-                <label id="lblImpTerm">学期
+                <label class="field meta-field" id="lblImpTerm">
+                  <span class="field-label">学期</span>
                   <select id="impTerm"></select>
                 </label>
-                <label id="lblImpSubject">科目
+                <label class="field meta-field">
+                  <span class="field-label" id="impSubjectLabel">科目</span>
                   <select id="impSubject"></select>
                   <input type="text" id="impSubjectInput" class="classify-input" list="dlSubject" placeholder="输入或选择" hidden>
                   <datalist id="dlSubject"></datalist>
@@ -92,7 +95,7 @@
             <div id="previewList" class="preview-list"></div>
           </div>
 
-          <div class="card">
+          <div class="card" data-step-gate>
             <h2 class="card-title">手动添加</h2>
             <form id="manualForm" class="form">
               <label class="field">

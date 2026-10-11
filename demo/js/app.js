@@ -45,12 +45,49 @@
     el.className = 'status' + (type ? ' ' + type : '');
   }
 
+  /* ---------- UI 偏好（服务端持久化，解决动态端口导致 localStorage 失效） ---------- */
+  const Prefs = {
+    data: {},
+    async load() {
+      try {
+        const r = await fetch('/api/ui_prefs');
+        this.data = r.ok ? await r.json() : {};
+      } catch (e) { this.data = {}; }
+      if (typeof this.data !== 'object' || this.data === null) this.data = {};
+    },
+    get(k, d) { return (k in this.data) ? this.data[k] : d; },
+    set(k, v) {
+      this.data[k] = v;
+      fetch('/api/ui_prefs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [k]: v })
+      }).catch(() => {});
+    }
+  };
+
   /* ---------- 学段状态 ---------- */
-  let curStage = localStorage.getItem('cuotiji_stage') || '小学';
-  if (!STAGES.includes(curStage)) curStage = '小学';
+  // 首次启动（服务端无记录）时不预选学段，引导用户主动选择
+  let curStage = '';
+
+  function gradesForStage(stage) {
+    if (stage === '小学') return GRADES.slice(0, 6);
+    if (stage === '初中') return GRADES.slice(6, 9);
+    if (stage === '高中') return GRADES.slice(9, 12);
+    return GRADES;
+  }
 
   function saveStage() {
-    localStorage.setItem('cuotiji_stage', curStage);
+    Prefs.set('stage', curStage);
+  }
+
+  // 学段未选时锁定录入区（步骤条第 1 步门禁，参考常见 App 的引导逻辑）
+  function updateImportLock() {
+    const locked = !STAGES.includes(curStage);
+    $$('.card[data-step-gate]').forEach(c => c.classList.toggle('locked', locked));
+    $('#stageHint').textContent = locked
+      ? '👆 第一步：先点上面的学段，再开始录入'
+      : '';
   }
 
   function qtypeOptions(stage, current) {
@@ -75,7 +112,8 @@
       selGrade.hidden = false; inpGrade.hidden = true;
       selSubject.hidden = false; inpSubject.hidden = true;
       lblTerm.style.display = '';
-      fillSelect(selGrade, GRADES, null);
+      // 年级选项按学段过滤：小学只有 1~6 年级，不会冒出初中高中
+      fillSelect(selGrade, gradesForStage(curStage), null);
       fillSelect(selTerm, TERMS, null);
       fillSelect(selSubject, SUBJECTS, null);
     } else {
@@ -94,13 +132,11 @@
       const dlSubject = $('#dl' + (prefix === 'imp' ? 'Subject' : 'Subject2'));
       dlSubject.innerHTML = subSet.map(s => `<option value="${esc(s)}">`).join('');
     }
-    // 标签随学段变化
+    // 标签随学段变化（统一用 .field-label 结构，字体一致）
     const gradeLabel = isK12 ? T.labelGradeK12 : curStage === '大学' ? T.labelGradeUni : curStage === '职业考试' ? T.labelGradeVoc : '分类一';
     const subjectLabel = isK12 ? T.labelSubjectK12 : curStage === '大学' ? T.labelSubjectUni : T.labelSubjectVoc;
-    const gEl = prefix === 'imp' ? $('#lblImpGrade') : $('#lblMGrade');
-    gEl.childNodes[0].textContent = gradeLabel;
-    const sEl = prefix === 'imp' ? $('#lblImpSubject') : $('#lblMSubject');
-    sEl.childNodes[0].textContent = subjectLabel;
+    (prefix === 'imp' ? $('#impGradeLabel') : $('#mGradeLabel')).textContent = gradeLabel;
+    (prefix === 'imp' ? $('#impSubjectLabel') : $('#mSubjectLabel')).textContent = subjectLabel;
   }
 
   // 读取当前分类值
@@ -298,25 +334,31 @@
   });
   $('#btnAiSettings').addEventListener('click', openAiSettings);
 
-  // 侧栏折叠
+  // 侧栏折叠（偏好存服务端）
   function setCollapsed(c) {
     $('#sidebar').classList.toggle('collapsed', c);
-    localStorage.setItem('cuotiji_collapsed', c ? '1' : '');
+    Prefs.set('collapsed', c ? '1' : '');
   }
   $('#btnCollapse').addEventListener('click', () => {
     setCollapsed(!$('#sidebar').classList.contains('collapsed'));
   });
 
-  // 主题（浅色/深色）
+  // 主题（浅色/深色；偏好存服务端，三态：跟随系统/浅色/深色）
+  const themeMq = window.matchMedia('(prefers-color-scheme: dark)');
   function applyTheme() {
-    const dark = localStorage.getItem('cuotiji_theme') === 'dark';
+    const mode = Prefs.get('theme', 'auto'); // auto | light | dark
+    const dark = mode === 'dark' || (mode === 'auto' && themeMq.matches);
     document.documentElement.dataset.theme = dark ? 'dark' : '';
+    const btn = $('#btnTheme');
+    if (btn) btn.textContent = { auto: '🌓 外观·自动', light: '☀️ 外观·浅色', dark: '🌙 外观·深色' }[mode];
   }
   $('#btnTheme').addEventListener('click', () => {
-    const dark = localStorage.getItem('cuotiji_theme') === 'dark';
-    localStorage.setItem('cuotiji_theme', dark ? '' : 'dark');
+    const order = ['auto', 'light', 'dark'];
+    const cur = Prefs.get('theme', 'auto');
+    Prefs.set('theme', order[(order.indexOf(cur) + 1) % order.length]);
     applyTheme();
   });
+  themeMq.addEventListener('change', applyTheme);
 
   // 数据菜单
   $('#btnDataMenu').addEventListener('click', e => {
@@ -331,7 +373,7 @@
 
   /* ================= 首次引导（3 步，可跳过） ================= */
   function initOnboard() {
-    if (localStorage.getItem('cuotiji_onboarded')) return;
+    if (Prefs.get('onboarded')) return; // 仅首次启动弹出，跳过/完成后不再显示
     const steps = T.onboard;
     let idx = 0;
     const overlay = $('#onboard');
@@ -351,7 +393,7 @@
       render();
     });
     function done() {
-      localStorage.setItem('cuotiji_onboarded', '1');
+      Prefs.set('onboarded', '1');
       overlay.hidden = true;
     }
   }
@@ -1600,7 +1642,8 @@
     const stage = $('#' + prefix + 'Stage').value;
     const isK12 = K12_STAGES.includes(stage);
     const pool = store.all().filter(q => !stage || q.stage === stage);
-    const grades = isK12 ? GRADES : [...new Set(pool.map(q => q.grade).filter(Boolean))];
+    // 年级选项按学段过滤（修复：选小学不再出现初中/高中）
+    const grades = isK12 ? gradesForStage(stage) : [...new Set(pool.map(q => q.grade).filter(Boolean))];
     const subjects = isK12 ? SUBJECTS : [...new Set(pool.map(q => q.subject).filter(Boolean))];
     fillSelect('#' + prefix + 'Grade', grades, isK12 ? '全部年级' : '全部' + (stage === '大学' ? '课程' : stage === '职业考试' ? '考试' : '分类一'));
     fillSelect('#' + prefix + 'Subject', subjects, isK12 ? '全部科目' : '全部' + (stage === '大学' ? '章节' : '科目'));
@@ -1637,11 +1680,16 @@
   }
 
   async function init() {
+    // 先加载服务端偏好（主题/侧栏折叠/学段/引导标记），再渲染 UI
+    await Prefs.load();
+    const savedStage = Prefs.get('stage', '');
+    curStage = STAGES.includes(savedStage) ? savedStage : '';
+
     applyTheme();
     if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
       setCollapsed(true);
     } else {
-      setCollapsed(localStorage.getItem('cuotiji_collapsed') === '1');
+      setCollapsed(Prefs.get('collapsed') === '1');
     }
 
     renderStageChips();
@@ -1661,6 +1709,7 @@
 
     renderClassifyUI('imp');
     renderClassifyUI('m');
+    updateImportLock();
 
     initHints();
     initPdfUI();
@@ -1677,6 +1726,8 @@
       renderClassifyUI('m');
       fillSelect('#mQtype', qtypeOptions(curStage), null);
       renderPreview();
+      updateImportLock();
+      updateSteps();
     });
 
     // 大学/职考：分类一变化时刷新分类二建议
