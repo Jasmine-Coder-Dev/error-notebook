@@ -59,12 +59,7 @@ localStorage 仅用于一次性迁移标记：
 
   /* 分类建议种子（与 catalog.json 种子一致；录入时与输入历史合并去重） */
   const CLASSIFY_SEEDS = {
-    '大学': [
-      { grade: '高等数学', subject: '' },
-      { grade: '线性代数', subject: '' },
-      { grade: '概率论与数理统计', subject: '' },
-      { grade: '大学英语（四六级）', subject: '' }
-    ],
+    '大学': UNI_MAJORS.filter(m => m !== '公共基础').map(m => ({ grade: m, subject: '' })),
     '职业考试': [
       { grade: '中级会计', subject: '中级会计实务' },
       { grade: '中级会计', subject: '财务管理' },
@@ -133,6 +128,9 @@ localStorage 仅用于一次性迁移标记：
     window.dispatchEvent(new CustomEvent('cjt:migrated', { detail: r.inserted || 0 }));
   }
 
+  CJT.UNI_YEARS = UNI_YEARS;
+  CJT.UNI_MAJORS = UNI_MAJORS;
+  CJT.UNI_COURSES = UNI_COURSES;
   CJT.GRADE_SUBJECTS = GRADE_SUBJECTS;
   CJT.STAGE_SUBJECTS = STAGE_SUBJECTS;
   CJT.CONST = { GRADES, TERMS, SUBJECTS, MASTERY, STAGES, K12_STAGES, QTYPE_VOCAB, CLASSIFY_SEEDS, hasTerm, stageOfGrade };
@@ -290,7 +288,7 @@ localStorage 仅用于一次性迁移标记：
     {
       text: '求极限：lim(x→0) sin(3x) / x = ？',
       answer: '3。利用等价无穷小 sin(3x) ~ 3x，原式 = lim 3x/x = 3。',
-      grade: '高等数学', subject: '第一章 函数与极限',
+      grade: '公共基础', subject: '高等数学', term: '大一',
       knowledgePoints: ['极限', '等价无穷小'],
       isWrong: true, wrongReason: '等价无穷小替换条件记错', mastery: '未掌握',
       qtype: '计算证明', stage: '大学',

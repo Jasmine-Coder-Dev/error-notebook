@@ -45,10 +45,10 @@
     onboardDone: '开始用',
     // 分类标签
     labelGradeK12: '年级',
-    labelGradeUni: '课程',
+    labelGradeUni: '专业门类',
     labelGradeVoc: '考试项目',
     labelSubjectK12: '科目',
-    labelSubjectUni: '章节',
+    labelSubjectUni: '课程',
     labelSubjectVoc: '科目'
   };
 })();

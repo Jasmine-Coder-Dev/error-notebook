@@ -3,7 +3,7 @@
   const CJT = window.CJT;
   const T = CJT.TEXTS;
   const { GRADES, TERMS, SUBJECTS, MASTERY, STAGES, K12_STAGES, QTYPE_VOCAB, CLASSIFY_SEEDS, hasTerm, stageOfGrade } = CJT.CONST;
-  const { GRADE_SUBJECTS, STAGE_SUBJECTS } = CJT;
+  const { GRADE_SUBJECTS, STAGE_SUBJECTS, UNI_YEARS, UNI_MAJORS, UNI_COURSES } = CJT;
   const store = CJT.store;
 
   const $ = (sel, root) => (root || document).querySelector(sel);
@@ -98,28 +98,40 @@
     return opts;
   }
 
-  /* ---------- 分类一/二控件（学段联动：K12 下拉，其余自由输入+建议） ---------- */
-  // prefix: 'imp' | 'm'；K12 用 select，大学/职考/其他用 input+datalist
+  /* ---------- 分类一/二控件（三分支：K12 / 大学 / 自由输入） ----------
+     K12：分类一=年级，分类二=科目（按年级联动），term=学期
+     大学：分类一=专业门类，分类二=课程（按门类联动），term=学年（大一~大四）
+     职考/其他：自由输入 + 种子/历史建议 */
   function renderClassifyUI(prefix) {
     const isK12 = K12_STAGES.includes(curStage);
+    const isUni = curStage === '大学';
     const selGrade = $('#' + prefix + 'Grade');
     const inpGrade = $('#' + prefix + 'GradeInput');
     const selTerm = $('#' + prefix + 'Term');
     const lblTerm = $('#lbl' + (prefix === 'imp' ? 'Imp' : 'M') + 'Term');
     const selSubject = $('#' + prefix + 'Subject');
     const inpSubject = $('#' + prefix + 'SubjectInput');
+    const uniHist = store.all().filter(q => q.stage === '大学');
 
     if (isK12) {
       selGrade.hidden = false; inpGrade.hidden = true;
       selSubject.hidden = false; inpSubject.hidden = true;
       lblTerm.style.display = '';
-      // 年级选项按学段过滤（小学 1~6 年级 / 初中 初一~初三 / 高中）
       fillSelect(selGrade, gradesForStage(curStage), null);
       fillSelect(selTerm, TERMS, null);
-      // 科目按所选年级联动：显示该年级实际开设的科目；未选年级时显示学段并集
       const g = selGrade.value;
       const subjects = g && GRADE_SUBJECTS[g] ? GRADE_SUBJECTS[g] : (STAGE_SUBJECTS[curStage] || SUBJECTS);
       fillSelect(selSubject, subjects, null);
+    } else if (isUni) {
+      selGrade.hidden = false; inpGrade.hidden = true;
+      selSubject.hidden = false; inpSubject.hidden = true;
+      lblTerm.style.display = '';
+      fillSelect(selGrade, UNI_MAJORS, null);
+      fillSelect(selTerm, UNI_YEARS, null); // term 列复用为学年
+      // 课程按所选门类联动：内置课程 + 该门类历史输入
+      const m = selGrade.value || '公共基础';
+      const hist = [...new Set(uniHist.filter(q => q.grade === m).map(q => q.subject).filter(Boolean))];
+      fillSelect(selSubject, [...new Set((UNI_COURSES[m] || []).concat(hist))], null);
     } else {
       selGrade.hidden = true; inpGrade.hidden = false;
       selSubject.hidden = true; inpSubject.hidden = true;
@@ -136,21 +148,26 @@
       const dlSubject = $('#dl' + (prefix === 'imp' ? 'Subject' : 'Subject2'));
       dlSubject.innerHTML = subSet.map(s => `<option value="${esc(s)}">`).join('');
     }
-    // 标签随学段变化（统一用 .field-label 结构，字体一致）
-    const gradeLabel = isK12 ? T.labelGradeK12 : curStage === '大学' ? T.labelGradeUni : curStage === '职业考试' ? T.labelGradeVoc : '分类一';
-    const subjectLabel = isK12 ? T.labelSubjectK12 : curStage === '大学' ? T.labelSubjectUni : T.labelSubjectVoc;
+    // 标签随学段变化（统一 .field-label 结构）
+    const gradeLabel = isK12 ? T.labelGradeK12 : isUni ? T.labelGradeUni : curStage === '职业考试' ? T.labelGradeVoc : '分类一';
+    const subjectLabel = isK12 ? T.labelSubjectK12 : isUni ? T.labelSubjectUni : T.labelSubjectVoc;
     (prefix === 'imp' ? $('#impGradeLabel') : $('#mGradeLabel')).textContent = gradeLabel;
     (prefix === 'imp' ? $('#impSubjectLabel') : $('#mSubjectLabel')).textContent = subjectLabel;
+    // 第三列标签：K12=学期，大学=学年，其余隐藏
+    const termLabel = prefix === 'imp' ? $('#impTermLabel') : $('#mTermLabel');
+    if (termLabel) termLabel.textContent = isK12 ? '学期' : isUni ? '学年' : '';
   }
 
   // 读取当前分类值
   function classifyValue(prefix) {
     const isK12 = K12_STAGES.includes(curStage);
+    const isUni = curStage === '大学';
+    const useSelect = isK12 || isUni;
     return {
       stage: curStage,
-      grade: isK12 ? $('#' + prefix + 'Grade').value : $('#' + prefix + 'GradeInput').value.trim(),
-      term: isK12 ? $('#' + prefix + 'Term').value : '',
-      subject: isK12 ? $('#' + prefix + 'Subject').value : $('#' + prefix + 'SubjectInput').value.trim()
+      grade: useSelect ? $('#' + prefix + 'Grade').value : $('#' + prefix + 'GradeInput').value.trim(),
+      term: useSelect ? $('#' + prefix + 'Term').value : '',
+      subject: useSelect ? $('#' + prefix + 'Subject').value : $('#' + prefix + 'SubjectInput').value.trim()
     };
   }
 
@@ -1652,20 +1669,34 @@
     const isK12 = K12_STAGES.includes(stage);
     const pool = store.all().filter(q => !stage || q.stage === stage);
     // 年级选项按学段过滤（修复：选小学不再出现初中/高中）
-    const grades = isK12 ? gradesForStage(stage) : [...new Set(pool.map(q => q.grade).filter(Boolean))];
-    // 科目按筛选条件联动：选了具体年级→该年级科目；只选学段→学段并集
+    const isUni = stage === '大学';
+    const grades = isK12 ? gradesForStage(stage)
+      : isUni ? [...new Set(UNI_MAJORS.concat(pool.map(q => q.grade).filter(Boolean)))]
+      : [...new Set(pool.map(q => q.grade).filter(Boolean))];
+    // 科目联动：K12 按年级；大学按门类（内置课程+历史）；其余历史
     const g = $('#' + prefix + 'Grade').value;
     const subjects = isK12
       ? (g && GRADE_SUBJECTS[g] ? GRADE_SUBJECTS[g] : (STAGE_SUBJECTS[stage] || SUBJECTS))
-      : [...new Set(pool.map(q => q.subject).filter(Boolean))];
-    fillSelect('#' + prefix + 'Grade', grades, isK12 ? '全部年级' : '全部' + (stage === '大学' ? '课程' : stage === '职业考试' ? '考试' : '分类一'));
-    fillSelect('#' + prefix + 'Subject', subjects, isK12 ? '全部科目' : '全部' + (stage === '大学' ? '章节' : '科目'));
+      : isUni
+        ? (g && UNI_COURSES[g] ? [...new Set(UNI_COURSES[g].concat(pool.filter(q => q.grade === g).map(q => q.subject).filter(Boolean)))] : [...new Set(pool.map(q => q.subject).filter(Boolean))])
+        : [...new Set(pool.map(q => q.subject).filter(Boolean))];
+    fillSelect('#' + prefix + 'Grade', grades, isK12 ? '全部年级' : '全部' + (stage === '大学' ? '专业门类' : stage === '职业考试' ? '考试' : '分类一'));
+    fillSelect('#' + prefix + 'Subject', subjects, isK12 ? '全部科目' : '全部' + (stage === '大学' ? '课程' : '科目'));
     const termSel = $('#' + prefix + 'Term');
-    if (termSel) termSel.closest('label') || termSel;
-    // 学期筛选：仅 K12 显示
+    // 学期/学年筛选：K12 显示学期(上/下)，大学显示学年(大一~大四)，其余隐藏
     const termWrap = termSel ? termSel.parentElement : null;
-    if (termWrap && termWrap.tagName === 'LABEL') termWrap.style.display = hasTerm(stage) ? '' : 'none';
-    if (!isK12) termSel && (termSel.value = '');
+    if (termWrap && termWrap.tagName === 'LABEL') termWrap.style.display = (isK12 || isUni) ? '' : 'none';
+    if (termSel) termSel.style.display = (isK12 || isUni) ? '' : 'none';
+    if (isK12) {
+      fillSelect(termSel, TERMS, '全部学期');
+    } else if (isUni) {
+      fillSelect(termSel, UNI_YEARS, '全部学年');
+    } else {
+      termSel && (termSel.value = '');
+    }
+    // term 标签
+    const termLabel = $('#' + prefix + 'TermLabel');
+    if (termLabel) termLabel.textContent = isK12 ? '学期' : isUni ? '学年' : '';
   }
 
   ['f', 'p', 'a'].forEach(prefix => {

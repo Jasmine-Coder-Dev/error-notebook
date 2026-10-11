@@ -29,6 +29,8 @@ pub fn stage_of_grade(grade: &str) -> &'static str {
 }
 
 /// 学段是否显示学期（仅 K12）。
+pub const UNI_YEARS: &[&str] = &["大一", "大二", "大三", "大四"];
+
 pub fn has_term(stage: &str) -> bool {
     matches!(stage, "小学" | "初中" | "高中")
 }
@@ -148,6 +150,11 @@ fn migrate(c: &Connection) -> Result<(), String> {
         c.execute("UPDATE questions SET grade = ?1 WHERE grade = ?2", rusqlite::params![new, old])
             .map_err(|e| e.to_string())?;
     }
+    // 大学旧数据迁移：分类一曾是课程名 → 改为门类"公共基础"（幂等）
+    c.execute(
+        "UPDATE questions SET grade = '公共基础' WHERE stage = '大学' AND grade IN ('高等数学','线性代数','概率论与数理统计','大学英语（四六级）','大学英语','大学物理','程序设计基础')",
+        [],
+    ).map_err(|e| e.to_string())?;
     // 回填：空 stage 按 grade 推断
     c.execute(
         "UPDATE questions SET stage = CASE
@@ -213,7 +220,12 @@ pub fn normalize(data: &Map<String, Value>) -> Map<String, Value> {
         _ => stage_of_grade(&grade).to_string(),
     };
     // 学期：仅 K12 学段保留；大学/职业考试等存空
-    let term = if has_term(&stage) { get_s("term").unwrap_or_default() } else { String::new() };
+    let term = if has_term(&stage) {
+        get_s("term").unwrap_or_default()
+    } else if stage == "大学" {
+        let t = get_s("term").unwrap_or_default();
+        if UNI_YEARS.contains(&t.as_str()) { t } else { String::new() }
+    } else { String::new() };
     let subject = get_s("subject").unwrap_or_default();
     let mastery = match get_s("mastery") {
         Some(v) if MASTERY.contains(&v.as_str()) => json!(v),
@@ -509,10 +521,13 @@ mod tests {
 
     #[test]
     fn normalize_keeps_explicit_stage() {
-        let q = norm(json!({"text": "t", "stage": "大学", "grade": "高等数学"}));
+        let q = norm(json!({"text": "t", "stage": "大学", "grade": "工学", "subject": "数据结构", "term": "大二"}));
         assert_eq!(q["stage"], "大学");
-        assert_eq!(q["grade"], "高等数学");
-        assert_eq!(q["term"], ""); // 大学无学期
+        assert_eq!(q["grade"], "工学");
+        assert_eq!(q["subject"], "数据结构");
+        assert_eq!(q["term"], "大二"); // 大学保留学年
+        let q2 = norm(json!({"text": "t", "stage": "大学", "grade": "工学", "term": "上"}));
+        assert_eq!(q2["term"], ""); // 非法学年清空
         let q = norm(json!({"text": "t", "stage": "职业考试", "grade": "中级会计", "subject": "财务管理", "term": "上"}));
         assert_eq!(q["stage"], "职业考试");
         assert_eq!(q["subject"], "财务管理");

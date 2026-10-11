@@ -345,7 +345,7 @@ fn entry_matches(entry: &Value, stage: &str, grade: &str, term: &str, subject: &
     if !stage.is_empty() && entry.get("stage").and_then(|v| v.as_str()) != Some(stage) { return false; }
     if !grade.is_empty() && entry.get("grade").and_then(|v| v.as_str()) != Some(grade) { return false; }
     match stage {
-        "大学" => true, // 学期/章节不适用
+        "大学" => subject.is_empty() || entry.get("subject").and_then(|v| v.as_str()) == Some(subject),
         "职业考试" => subject.is_empty() || entry.get("subject").and_then(|v| v.as_str()) == Some(subject),
         _ => term.is_empty() || entry.get("term").and_then(|v| v.as_str()) == Some(term),
     }
