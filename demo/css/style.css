@@ -204,6 +204,9 @@ html[data-platform="linux"] .sidebar {
 }
 .step.current { color: var(--primary); font-weight: 600; }
 .step.current i { background: var(--primary); color: #fff; }
+.step.done { color: var(--ok); }
+.step.done i { background: var(--ok); color: #fff; }
+.step.done i::before { content: "✓"; }
 .step::after { content: ""; width: 36px; height: 1px; background: var(--border); margin: 0 10px; }
 .step:last-child::after { display: none; }
 

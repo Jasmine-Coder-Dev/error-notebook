@@ -435,9 +435,14 @@
   }
 
   function updateSteps() {
+    // 三步状态机：0 选择学段（未选时永远停在第 1 步）→ 1 上传或输入 → 2 预览确认
+    const stageOk = STAGES.includes(curStage);
     const hasItems = pdfItems.length > 0 || $('#mText').value.trim().length > 0;
-    const steps = $$('#importSteps .step');
-    steps.forEach((s, i) => s.classList.toggle('current', i === (hasItems ? 2 : 1)));
+    const cur = !stageOk ? 0 : hasItems ? 2 : 1;
+    $$('#importSteps .step').forEach((s, i) => {
+      s.classList.toggle('current', i === cur);
+      s.classList.toggle('done', i < cur);
+    });
   }
 
   /* ================= PDF 导入 ================= */
