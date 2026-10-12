@@ -28,6 +28,22 @@
     errUnreachable: '连不上本地服务。请重启应用；如果还不行，把 ~/.cuotiji/app.log 发给开发者。',
     errNoKey: '还没有填 AI 服务密钥。打开「AI 设置」，或选「Mock（离线体验）」先试用。',
     errAuth: '密钥好像不对，连不上 AI 服务。请回官网重新复制一遍。',
+    // 首次配置 AI 教程（§0 说人话约束）
+    aiTutorialTitle: '🔰 第一次配置？三步搞定',
+    aiTutorialWhat: 'AI 服务密钥：在 AI 厂商官网注册账号后领取的一串字符，类似「会员卡号」。错题集的 AI 功能（打标/解析/识别图片）靠它调用对应厂商的服务，密钥只保存在你自己的电脑上。',
+    aiTutorialSteps: [
+      '① 在下面选好服务商，点对应官网链接注册账号（都有免费额度）',
+      '② 在官网「API Keys / 密钥管理」页面创建密钥，复制那串字符',
+      '③ 粘贴到下方输入框 → 点「保存设置」→ 点「测试连接」，看到绿色提示就成功了'
+    ],
+    aiTutorialLinks: {
+      glm: { name: 'GLM 智谱', url: 'https://open.bigmodel.cn/' },
+      deepseek: { name: 'DeepSeek', url: 'https://platform.deepseek.com/' },
+      kimi: { name: 'Kimi 月之暗面', url: 'https://platform.moonshot.cn/' },
+      minimax: { name: 'MiniMax', url: 'https://platform.minimaxi.com/' },
+      qwen: { name: 'Qwen 阿里', url: 'https://bailian.console.aliyun.com/' }
+    },
+    aiTutorialMock: '不想配置？选「Mock（离线联调，无需 Key）」可以直接体验全部 AI 流程，返回模拟数据。图片识别需要选带视觉能力的模型（如 deepseek-flash、qwen3.8-omni-flash）。',
     errNetwork: '网络连不上 AI 服务，请检查网络后重试。',
     errOutput: 'AI 返回的内容格式不对，请重试一次；多次失败可换一家厂商。',
     // 删除确认

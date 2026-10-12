@@ -513,6 +513,24 @@ input:focus, textarea:focus, select:focus, .classify-input:focus {
 .ai-item label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
 .ai-item input[type="checkbox"] { margin-top: 5px; }
 
+.ai-tutorial {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+}
+.ai-tutorial summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--primary);
+  user-select: none;
+}
+.ai-tutorial .hint { margin: 8px 0; }
+.tutorial-steps { margin: 8px 0; padding-left: 18px; font-size: 13px; line-height: 1.9; }
+.tutorial-links { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.tutorial-links a { text-decoration: none; }
+
 .ai-set-form { display: flex; flex-direction: column; gap: 12px; }
 .ai-set-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .ai-set-row .field { flex: 1; min-width: 180px; }

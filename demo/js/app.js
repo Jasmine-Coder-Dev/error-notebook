@@ -264,8 +264,23 @@
       return;
     }
     const providers = provData.providers;
+    // 首次配置教程：从未配置过 Key（或当前无 Key）时默认展开
+    const tutorial = `
+      <details class="ai-tutorial" ${st.has_key ? '' : 'open'}>
+        <summary>${esc(T.aiTutorialTitle)}</summary>
+        <p class="hint">${esc(T.aiTutorialWhat)}</p>
+        <ol class="tutorial-steps">
+          ${T.aiTutorialSteps.map(s => `<li>${esc(s)}</li>`).join('')}
+        </ol>
+        <div class="tutorial-links">
+          ${Object.values(T.aiTutorialLinks).map(l =>
+            `<a class="btn small" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.name)}官网 ↗</a>`).join('')}
+        </div>
+        <p class="hint">${esc(T.aiTutorialMock)}</p>
+      </details>`;
     body.innerHTML = `
       <div class="ai-set-form">
+        ${tutorial}
         <label class="field">
           <span class="field-label">AI 服务商
             <span class="hint-tip" data-tip-key="tipAiKey">?</span>
