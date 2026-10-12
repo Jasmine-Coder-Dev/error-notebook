@@ -111,7 +111,7 @@ pub fn run() {
                     #[cfg(target_os = "windows")]
                     {
                         use window_vibrancy::apply_mica;
-                        if apply_mica(&window, false).is_ok() {
+                        if apply_mica(&window, Some(false)).is_ok() {
                             log_line("已启用 Windows Mica");
                         }
                     }
