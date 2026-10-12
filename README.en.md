@@ -24,6 +24,27 @@ English | **[中文](README.md)**
 
 Wrong answers are scattered across exam papers, workbooks and photos. Parents copy them by hand; commercial apps push cloud accounts and subscriptions. This project automates the whole loop: **upload a paper → auto-split into questions → mark mistakes → AI knowledge-point tagging → generate & print targeted practice sheets** — all running locally, your data never leaves your machine.
 
+
+## 📸 Screenshots
+
+<div align="center">
+
+| Capture & stage gating | Question bank |
+| --- | --- |
+| ![Import](docs/screenshots/01-import-light.png) | ![Bank](docs/screenshots/02-bank-light.png) |
+
+| Question-type analytics | Knowledge graph (sunburst) |
+| --- | --- |
+| ![Analytics](docs/screenshots/03-analysis-qtype.png) | ![Graph](docs/screenshots/04-analysis-graph.png) |
+
+| Paper generation & printing | Daily review (SM-2 grading) |
+| --- | --- |
+| ![Paper](docs/screenshots/05-paper.png) | ![Review](docs/screenshots/06-review.png) |
+
+**Dark mode**: ![Bank dark](docs/screenshots/07-bank-dark.png) · ![Graph dark](docs/screenshots/08-analysis-dark.png)
+
+</div>
+
 ## ✨ Features
 
 ### Capture

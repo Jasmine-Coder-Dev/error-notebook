@@ -24,6 +24,31 @@
 
 孩子每次考试的错题散落在试卷、练习册、照片里，家长手工抄题整理费时费力，买来的错题本 App 又强推云账号和订阅。这个项目把整条链路自动化：**上传试卷 → 自动切题 → 勾选错题 → AI 打知识点标签 → 按薄弱点组卷打印**，全程本地运行，数据永远在你自己电脑上。
 
+
+## 📸 界面预览
+
+<div align="center">
+
+| 录入题目（学段门禁 + 步骤条） | 错题集 |
+| --- | --- |
+| ![录入题目](docs/screenshots/01-import-light.png) | ![错题集](docs/screenshots/02-bank-light.png) |
+
+| 题型统计 | 知识图谱（旭日图） |
+| --- | --- |
+| ![题型统计](docs/screenshots/03-analysis-qtype.png) | ![知识图谱](docs/screenshots/04-analysis-graph.png) |
+
+| 组卷打印 | 今日复习（SM-2 三键评分） |
+| --- | --- |
+| ![组卷打印](docs/screenshots/05-paper.png) | ![今日复习](docs/screenshots/06-review.png) |
+
+**深色模式**：
+
+| 错题集（深色） | 知识图谱（深色） |
+| --- | --- |
+| ![错题集深色](docs/screenshots/07-bank-dark.png) | ![图谱深色](docs/screenshots/08-analysis-dark.png) |
+
+</div>
+
 ## ✨ 功能特性
 
 ### 录入
