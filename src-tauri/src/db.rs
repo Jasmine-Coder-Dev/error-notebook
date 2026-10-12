@@ -150,9 +150,11 @@ fn migrate(c: &Connection) -> Result<(), String> {
         c.execute("UPDATE questions SET grade = ?1 WHERE grade = ?2", rusqlite::params![new, old])
             .map_err(|e| e.to_string())?;
     }
-    // 大学旧数据迁移：分类一曾是课程名 → 改为门类"公共基础"（幂等）
+    // 大学旧数据迁移：分类一曾是课程名 → 改为门类"公共基础"（幂等）。
+    // 注意旧数据 stage 可能为空/其他（回填逻辑只识别 K12 年级），故按课程名匹配而非 stage。
     c.execute(
-        "UPDATE questions SET grade = '公共基础' WHERE stage = '大学' AND grade IN ('高等数学','线性代数','概率论与数理统计','大学英语（四六级）','大学英语','大学物理','程序设计基础')",
+        "UPDATE questions SET grade = '公共基础', stage = '大学' \
+         WHERE grade IN ('高等数学','线性代数','概率论与数理统计','大学英语（四六级）','大学英语','大学物理','程序设计基础')",
         [],
     ).map_err(|e| e.to_string())?;
     // 回填：空 stage 按 grade 推断
