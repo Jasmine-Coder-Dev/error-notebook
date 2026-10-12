@@ -20,8 +20,17 @@ pub const PROVIDERS: &[Provider] = &[
         id: "glm",
         name: "GLM 智谱",
         base_url: "https://open.bigmodel.cn/api/paas/v4",
-        // GLM-5 世代（2026-10 核实；以 bigmodel.cn 模型列表为准，免费档为 flash 系）
-        models: &["glm-5.3", "glm-5.2", "glm-5-flash"],
+        // GLM-5 世代（2026-10 核实）：glm-5v-turbo 为官方多模态模型（视觉+文本两用，首推）；
+        // glm-5.3/5-flash 为纯文本（以 bigmodel.cn 模型列表为准）
+        models: &["glm-5v-turbo", "glm-5.3", "glm-5-flash"],
+    },
+    Provider {
+        id: "glm-coding",
+        name: "GLM Coding Plan（编程套餐）",
+        // 官方文档核实（2026-10）：Coding Plan 的 OpenAI 兼容接入地址与按量付费不同；
+        // 套餐内 glm-5.3-flash 为多模态，glm-5.3 为纯文本
+        base_url: "https://open.bigmodel.cn/api/coding/paas/v4",
+        models: &["glm-5.3-flash", "glm-5.3"],
     },
     Provider {
         id: "deepseek",

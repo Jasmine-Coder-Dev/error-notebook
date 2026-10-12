@@ -276,6 +276,7 @@
           ${Object.values(T.aiTutorialLinks).map(l =>
             `<a class="btn small" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.name)}官网 ↗</a>`).join('')}
         </div>
+        <p class="hint">${esc(T.aiTutorialCoding)}</p>
         <p class="hint">${esc(T.aiTutorialMock)}</p>
       </details>`;
     body.innerHTML = `

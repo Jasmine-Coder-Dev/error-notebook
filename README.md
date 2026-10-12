@@ -91,7 +91,7 @@
 | --- | --- | --- |
 | DeepSeek | `deepseek-flash` | V4.1 世代；缓存命中低至 $0.003/百万 token，**且原生支持视觉**（官方文档核实） |
 | Qwen 阿里 | `qwen3.8-flash` | 低价档主力文本模型 |
-| GLM 智谱 | `glm-5.3` / `glm-5-flash` | GLM-5 世代；免费档通常为 flash 系（以 bigmodel.cn 列表为准） |
+| GLM 智谱 | `glm-5v-turbo`（多模态两用）/ `glm-5.3` / `glm-5-flash` | 官方视觉模型为 GLM-5V-Turbo；纯文本选 glm-5.3，免费档 flash 系（以 bigmodel.cn 列表为准） |
 | Kimi 月之暗面 | `kimi-k3` | K3 系列，当前主力 |
 | MiniMax | `MiniMax-M3` | 当前主力 |
 
@@ -102,7 +102,7 @@
 | DeepSeek | `deepseek-flash` | 官方定价页标注 Vision ✓，选它即可两用 |
 | Qwen 阿里 | `qwen3.8-omni-flash` | 全模态档；`qwen3.7-plus`/`qwen3.8-max` 也支持图像理解 |
 | Kimi | `kimi-k3` | 支持图像理解 |
-| GLM | GLM-5 视觉版 | 以 bigmodel.cn 模型列表中标注「图像理解」的型号为准 |
+| GLM | `glm-5v-turbo` | 官方多模态模型，日常任务与图片识别两用 |
 | MiniMax | — | 图片识别建议换用其他厂商 |
 
 选 **Mock** 无需 Key，离线体验全部 AI 流程。不配置 AI 不影响其他功能；模型字段为自由输入，厂商上新模型后直接填新 ID ��可用。

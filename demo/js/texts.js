@@ -43,7 +43,8 @@
       minimax: { name: 'MiniMax', url: 'https://platform.minimaxi.com/' },
       qwen: { name: 'Qwen 阿里', url: 'https://bailian.console.aliyun.com/' }
     },
-    aiTutorialMock: '不想配置？选「Mock（离线联调，无需 Key）」可以直接体验全部 AI 流程，返回模拟数据。图片识别需要选带视觉能力的模型（如 deepseek-flash、qwen3.8-omni-flash）。',
+    aiTutorialMock: '不想配置？选「Mock（离线联调，无需 Key）」可以直接体验全部 AI 流程，返回模拟数据。图片识别需要选带视觉能力的模型（如 glm-5v-turbo、deepseek-flash、qwen3.8-omni-flash、kimi-k3）。',
+    aiTutorialCoding: '💡 已订阅编程套餐（Coding Plan）？GLM 用户直接选「GLM Coding Plan」厂商、粘贴套餐密钥即可（套餐内 glm-5.3-flash 支持图片）。其他家的套餐密钥通常也能直接粘到对应厂商使用，接口地址不用改。',
     errNetwork: '网络连不上 AI 服务，请检查网络后重试。',
     errOutput: 'AI 返回的内容格式不对，请重试一次；多次失败可换一家厂商。',
     // 删除确认

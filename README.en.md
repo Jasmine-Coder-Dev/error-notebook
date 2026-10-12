@@ -91,7 +91,7 @@ Open **AI Settings** in the app → pick a provider → paste your API key → *
 | --- | --- | --- |
 | DeepSeek | `deepseek-flash` | V4.1 generation; as low as $0.003/1M cached input, **natively supports vision** (per official docs) |
 | Alibaba Qwen | `qwen3.8-flash` | Low-cost workhorse |
-| Zhipu GLM | `glm-5.3` / `glm-5-flash` | GLM-5 generation; free tier is usually the flash variant |
+| Zhipu GLM | `glm-5v-turbo` (multimodal) / `glm-5.3` / `glm-5-flash` | Official vision model is GLM-5V-Turbo; glm-5.3 for text-only, flash for free tier |
 | Moonshot Kimi | `kimi-k3` | Current flagship series |
 | MiniMax | `MiniMax-M3` | Current flagship |
 
@@ -102,7 +102,7 @@ Open **AI Settings** in the app → pick a provider → paste your API key → *
 | DeepSeek | `deepseek-flash` | Vision ✓ per official pricing page — one model for everything |
 | Alibaba Qwen | `qwen3.8-omni-flash` | Omni tier; `qwen3.7-plus` / `qwen3.8-max` also accept images |
 | Moonshot Kimi | `kimi-k3` | Image understanding supported |
-| Zhipu GLM | GLM-5 vision variant | Pick a model marked "image understanding" on bigmodel.cn |
+| Zhipu GLM | `glm-5v-turbo` | Official multimodal model, one model for everything |
 | MiniMax | — | Prefer another provider for images |
 
 **Mock** works offline with no key. All non-AI features work without configuration; the model field is free text — new model IDs work as soon as providers release them.
