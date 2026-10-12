@@ -386,8 +386,20 @@
     const mode = Prefs.get('theme', 'auto'); // auto | light | dark
     const dark = mode === 'dark' || (mode === 'auto' && themeMq.matches);
     document.documentElement.dataset.theme = dark ? 'dark' : '';
+    // 只更新图标/文字两个 span，保持 side-icon/side-text 结构（折叠侧栏依赖该结构隐藏文字）
     const btn = $('#btnTheme');
-    if (btn) btn.textContent = { auto: '🌓 外观·自动', light: '☀️ 外观·浅色', dark: '🌙 外观·深色' }[mode];
+    if (btn) {
+      const icon = { auto: '🌗', light: '☀️', dark: '🌙' }[mode];
+      const label = { auto: '外观·自动', light: '外观·浅色', dark: '外观·深色' }[mode];
+      const iconEl = btn.querySelector('.side-icon');
+      const textEl = btn.querySelector('.side-text');
+      if (iconEl && textEl) {
+        iconEl.textContent = icon;
+        textEl.textContent = label;
+      } else {
+        btn.textContent = icon + ' ' + label;
+      }
+    }
   }
   $('#btnTheme').addEventListener('click', () => {
     const order = ['auto', 'light', 'dark'];
