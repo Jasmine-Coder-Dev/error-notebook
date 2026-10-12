@@ -115,7 +115,8 @@ Open **AI Settings** in the app → pick a provider → paste your API key → *
   - Phase 1: stage-based classification (college / professional exams), question-type charts, mastery weighting, sidebar UI, onboarding
   - Phase 2: question images, weakness-first paper generation, error trends
   - Phase 3: spaced repetition, mock exams
-- [ ] Next — system-level window materials (Liquid Glass / Mica), knowledge graph, SM-2 adaptive intervals
+- [x] v0.1.0 Beta — SM-2 adaptive review intervals, knowledge graph (sunburst), macOS Liquid Glass / Windows Mica, dual-appearance icon, university 3-level classification (major × course × year), AI presets updated + first-run tutorial + GLM Coding Plan, stage gating & step bar, full light/dark UI polish
+- [ ] Next — one-click scheduling for legacy questions, community knowledge graph, Windows on-device verification
 
 Full design (in Chinese): [docs/受众扩展方案.md](docs/受众扩展方案.md).
 
